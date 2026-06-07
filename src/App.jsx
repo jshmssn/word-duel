@@ -6,7 +6,7 @@ import {
   IconLightning, IconQuestion, IconDice, IconStar2, IconCopy
 } from "./icons/Icons.jsx";
 
-const SERVER_URL = "http://localhost:3001";
+const SERVER_URL = "word-duel-server-production.up.railway.app";
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 // Avatar colors cycle

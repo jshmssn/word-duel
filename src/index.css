@@ -1904,7 +1904,10 @@ input {
   border-radius: 8px;
   box-shadow: 0 0 10px rgba(0, 229, 255, 0.35);
   cursor: pointer;
-  transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+  transition:
+    transform 0.15s,
+    box-shadow 0.15s,
+    background 0.15s;
   text-align: center;
 }
 
@@ -1916,4 +1919,228 @@ input {
 
 .action-card .letter-count-tile:active {
   transform: scale(0.95);
+}
+
+/* ============================================================
+   MOBILE SAFE FIXES - prevent cards/buttons from being cut
+============================================================ */
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.screen {
+  width: 100%;
+  max-width: 100vw;
+  padding-left: max(12px, env(safe-area-inset-left));
+  padding-right: max(12px, env(safe-area-inset-right));
+  padding-bottom: max(96px, env(safe-area-inset-bottom));
+  overflow-x: hidden;
+}
+
+.game-layout,
+.waiting-main,
+.lobby-wrap,
+.gameover-card {
+  width: 100%;
+  max-width: min(600px, 100%);
+  min-width: 0;
+}
+
+.word-card,
+.alpha-section,
+.action-card,
+.game-log,
+.turn-timer-wrap,
+.prompt-modal,
+.disconnect-banner,
+.lobby-card,
+.room-code-box,
+.player-card {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+/* Alphabet: keep all buttons inside the card */
+.alphabet-grid-fun {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(36px, 1fr));
+  gap: 7px;
+  width: 100%;
+}
+
+.alpha-key {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+}
+
+/* Action tabs: avoid text/buttons being cut */
+.action-tab-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.action-tab-btn {
+  min-width: 0;
+  width: 100%;
+  padding: 10px 6px;
+  font-size: clamp(0.72rem, 3.2vw, 1rem);
+  line-height: 1.15;
+  white-space: normal;
+  word-break: normal;
+}
+
+/* Input rows: allow wrapping */
+.action-input-row {
+  width: 100%;
+  min-width: 0;
+}
+
+.guess-input {
+  min-width: 0;
+}
+
+/* Guess word row: desktop/tablet stays side by side */
+.action-input-row-guess {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.guess-submit-btn {
+  width: auto;
+  min-width: 112px;
+  padding: 12px 16px;
+  white-space: nowrap;
+}
+
+/* Small mobile: stack input and Guess button */
+@media (max-width: 430px) {
+  .screen {
+    padding: 12px;
+    padding-bottom: max(110px, env(safe-area-inset-bottom));
+  }
+
+  .game-layout {
+    gap: 12px;
+  }
+
+  .word-card,
+  .alpha-section,
+  .action-card,
+  .game-log {
+    padding: 14px;
+    border-width: 2.5px;
+  }
+
+  .turn-banner-fun {
+    align-items: stretch;
+  }
+
+  .category-tag,
+  .turn-badge {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .my-word-text {
+    font-size: clamp(1.25rem, 7vw, 1.6rem);
+    letter-spacing: 3px;
+  }
+
+  .letter-tile {
+    width: 31px;
+    height: 31px;
+    font-size: 0.9rem;
+  }
+
+  .action-input-row-guess {
+    grid-template-columns: 1fr;
+  }
+
+  .guess-submit-btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .single-key-input {
+    width: 54px;
+  }
+
+  .floating-chat-wrap {
+    right: max(14px, env(safe-area-inset-right));
+    bottom: max(14px, env(safe-area-inset-bottom));
+  }
+
+  .floating-chat-panel {
+    width: calc(100vw - 28px);
+    max-height: 55vh;
+  }
+}
+
+/* Very narrow screens */
+@media (max-width: 360px) {
+  .alphabet-grid-fun {
+    grid-template-columns: repeat(auto-fit, minmax(32px, 1fr));
+    gap: 6px;
+  }
+
+  .alpha-key {
+    height: 35px;
+    font-size: 0.9rem;
+  }
+
+  .action-tab-btn {
+    font-size: 0.68rem;
+    padding: 9px 4px;
+    gap: 4px;
+  }
+
+  .btn-icon-row {
+    gap: 6px;
+  }
+}
+
+/* Game over screen mobile fix */
+.reveal-words {
+  width: 100%;
+  min-width: 0;
+}
+
+.reveal-box {
+  min-width: 0;
+}
+
+.reveal-word {
+  max-width: 100%;
+  font-size: clamp(1.25rem, 7vw, 1.8rem);
+  letter-spacing: clamp(2px, 1vw, 4px);
+  overflow-wrap: anywhere;
+}
+
+.gameover-btns {
+  width: 100%;
+}
+
+@media (max-width: 430px) {
+  .gameover-card {
+    padding: 28px 18px;
+  }
+
+  .gameover-btns {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .gameover-btns .btn-fun {
+    width: 100%;
+    min-width: 0;
+  }
 }

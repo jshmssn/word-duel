@@ -28,8 +28,8 @@ import {
   IconHourglass,
 } from "./icons/Icons.jsx";
 
-const SERVER_URL = "word-duel-server-production.up.railway.app";
-// const SERVER_URL = "localhost:3001";
+// const SERVER_URL = "word-duel-server-production.up.railway.app";
+const SERVER_URL = "localhost:3001";
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 const AVATAR_COLORS = [
@@ -848,23 +848,33 @@ function GameScreen({
       },
     );
 
-    sock.on("letter-count-result", ({ askerId, askerName, responderName, letter, count, confirmedLetters: cl }) => {
-      setWaitingFor(null);
-      if (askerId === myId) {
-        setConfirmedLetters((prev) =>
-          Array.isArray(cl) ? cl : withLetterCount(prev, letter, count),
-        );
-        setAskedLetters((prev) => ({
-          ...prev,
-          [letter]: Number(count) > 0 ? "yes" : "no",
-        }));
-      }
-      addLog({
-        type: "count",
-        icon: <IconLetterCount size={14} color="currentColor" />,
-        text: `${responderName || askerName}: "${letter}" appears ${count} time${count !== 1 ? "s" : ""} in my word!`,
-      });
-    });
+    sock.on(
+      "letter-count-result",
+      ({
+        askerId,
+        askerName,
+        responderName,
+        letter,
+        count,
+        confirmedLetters: cl,
+      }) => {
+        setWaitingFor(null);
+        if (askerId === myId) {
+          setConfirmedLetters((prev) =>
+            Array.isArray(cl) ? cl : withLetterCount(prev, letter, count),
+          );
+          setAskedLetters((prev) => ({
+            ...prev,
+            [letter]: Number(count) > 0 ? "yes" : "no",
+          }));
+        }
+        addLog({
+          type: "count",
+          icon: <IconLetterCount size={14} color="currentColor" />,
+          text: `${responderName || askerName}: "${letter}" appears ${count} time${count !== 1 ? "s" : ""} in my word!`,
+        });
+      },
+    );
 
     sock.on("wrong-guess", ({ guesserName, guess }) => {
       addLog({
@@ -1197,13 +1207,9 @@ function GameScreen({
                 key={l}
                 className={`alpha-key ${askedLetters[l] === "yes" ? "asked-yes" : askedLetters[l] === "no" ? "asked-no" : ""}`}
                 onClick={() => {
-                  if (
-                    isMyTurn &&
-                    activeTab === "ask" &&
-                    !askedLetters[l] &&
-                    !waitingFor
-                  )
+                  if (isMyTurn && !askedLetters[l] && !waitingFor) {
                     handleAskLetter(l);
+                  }
                 }}
                 title={
                   askedLetters[l] === "yes"
@@ -1328,7 +1334,7 @@ function GameScreen({
               )}
 
               {activeTab === "guess" && (
-                <div className="action-input-row">
+                <div className="action-input-row action-input-row-guess">
                   <input
                     className="guess-input"
                     value={guessInput}
@@ -1337,8 +1343,7 @@ function GameScreen({
                     placeholder="Type the word..."
                   />
                   <button
-                    className="btn-fun btn-fun-pink"
-                    style={{ padding: "12px 18px", whiteSpace: "nowrap" }}
+                    className="btn-fun btn-fun-pink guess-submit-btn"
                     onClick={handleGuess}
                     disabled={!guessInput.trim()}
                   >
@@ -1537,7 +1542,11 @@ export default function App() {
 
   useEffect(() => {
     const sock = getSocket();
-    const handlePlayerJoined = ({ players: pl, turnDuration: td, creatorId: cid }) => {
+    const handlePlayerJoined = ({
+      players: pl,
+      turnDuration: td,
+      creatorId: cid,
+    }) => {
       setPlayers(pl);
       if (td !== undefined) setTurnDuration(td);
       if (cid !== undefined) setCreatorId(cid);
@@ -1551,14 +1560,19 @@ export default function App() {
       if (cid !== undefined) setCreatorId(cid);
     };
     const handleChatHistory = ({ messages }) => setChatMessages(messages);
-    const handleChatMessage = (msg) => setChatMessages((prev) => [...prev, msg]);
+    const handleChatMessage = (msg) =>
+      setChatMessages((prev) => [...prev, msg]);
     const handleGameStartEvent = (data) => {
       setGameState((prev) => ({ ...data, code: roomCode || prev?.code }));
       if (data.turnDuration !== undefined) setTurnDuration(data.turnDuration);
       setScreen("game");
       addSystemChat("Game started! Good luck!");
     };
-    const handleRematchLobby = ({ players: pl, turnDuration: td, creatorId: cid }) => {
+    const handleRematchLobby = ({
+      players: pl,
+      turnDuration: td,
+      creatorId: cid,
+    }) => {
       setPlayers(pl);
       if (td !== undefined) setTurnDuration(td);
       if (cid !== undefined) setCreatorId(cid);
@@ -1637,11 +1651,14 @@ export default function App() {
     [roomCode],
   );
 
-  const handleGameStart = useCallback((data) => {
-    setGameState((prev) => ({ ...data, code: roomCode || prev?.code }));
-    if (data.turnDuration !== undefined) setTurnDuration(data.turnDuration);
-    setScreen("game");
-  }, [roomCode]);
+  const handleGameStart = useCallback(
+    (data) => {
+      setGameState((prev) => ({ ...data, code: roomCode || prev?.code }));
+      if (data.turnDuration !== undefined) setTurnDuration(data.turnDuration);
+      setScreen("game");
+    },
+    [roomCode],
+  );
 
   if (screen === "lobby")
     return (

@@ -1083,6 +1083,15 @@ function GameScreen({
                 : "letter-count-dialog-title"
             }
           >
+            <div className="prompt-secret-panel" aria-label="Your secret word">
+              <div className="prompt-secret-label">
+                <IconShield size={16} color="currentColor" />
+                Your Secret Word
+              </div>
+              <div className="prompt-secret-text">{myWord.toUpperCase()}</div>
+              <div className="prompt-secret-count">{myWordLetterCount} letters</div>
+            </div>
+
             {letterAskPrompt && (
               <div className="prompt-modal">
                 <div

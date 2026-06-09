@@ -28,8 +28,8 @@ import {
   IconHourglass,
 } from "./icons/Icons.jsx";
 
-// const SERVER_URL = "word-duel-server-production.up.railway.app";
-const SERVER_URL = "localhost:3001";
+const SERVER_URL = "word-duel-server-production.up.railway.app";
+// const SERVER_URL = "localhost:3001";
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 const AVATAR_COLORS = [

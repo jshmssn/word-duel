@@ -28,8 +28,8 @@ import {
   IconHourglass,
 } from "./icons/Icons.jsx";
 
-const SERVER_URL = "word-duel-server-production.up.railway.app";
-// const SERVER_URL = "localhost:3001";
+// const SERVER_URL = "word-duel-server-production.up.railway.app";
+const SERVER_URL = "localhost:3001";
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 const AVATAR_COLORS = [
@@ -1071,73 +1071,94 @@ function GameScreen({
           </div>
         )}
 
-        {/* Letter ask prompt (for opponent) */}
-        {letterAskPrompt && (
-          <div className="prompt-modal">
-            <div className="prompt-title prompt-title-row">
-              <IconLetters size={18} color="currentColor" />
-              {letterAskPrompt.askerName} asked for the letter:
-            </div>
-            <div className="prompt-letter-badge">{letterAskPrompt.letter}</div>
-            <div className="prompt-question">
-              Is "<strong>{letterAskPrompt.letter}</strong>" in your word?
-            </div>
-            <div className="prompt-buttons">
-              <button
-                className="btn-fun btn-fun-green"
-                onClick={() => handleAnswerLetter(true)}
-              >
-                <span className="btn-icon-row">
-                  <IconCheck size={18} color="currentColor" />
-                  Yes
-                </span>
-              </button>
-              <button
-                className="btn-fun btn-fun-red"
-                onClick={() => handleAnswerLetter(false)}
-              >
-                <span className="btn-icon-row">
-                  <IconX size={18} color="currentColor" />
-                  No
-                </span>
-              </button>
-            </div>
-          </div>
-        )}
+        {/* Letter ask/count prompt (for opponent) */}
+        {(letterAskPrompt || letterCountPrompt) && (
+          <div
+            className="prompt-overlay"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={
+              letterAskPrompt
+                ? "letter-ask-dialog-title"
+                : "letter-count-dialog-title"
+            }
+          >
+            {letterAskPrompt && (
+              <div className="prompt-modal">
+                <div
+                  className="prompt-title prompt-title-row"
+                  id="letter-ask-dialog-title"
+                >
+                  <IconLetters size={18} color="currentColor" />
+                  {letterAskPrompt.askerName} asked for the letter:
+                </div>
+                <div className="prompt-letter-badge">
+                  {letterAskPrompt.letter}
+                </div>
+                <div className="prompt-question">
+                  Is "<strong>{letterAskPrompt.letter}</strong>" in your word?
+                </div>
+                <div className="prompt-buttons">
+                  <button
+                    className="btn-fun btn-fun-green"
+                    onClick={() => handleAnswerLetter(true)}
+                    autoFocus
+                  >
+                    <span className="btn-icon-row">
+                      <IconCheck size={18} color="currentColor" />
+                      Yes
+                    </span>
+                  </button>
+                  <button
+                    className="btn-fun btn-fun-red"
+                    onClick={() => handleAnswerLetter(false)}
+                  >
+                    <span className="btn-icon-row">
+                      <IconX size={18} color="currentColor" />
+                      No
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
 
-        {/* Letter count prompt (for opponent) */}
-        {letterCountPrompt && (
-          <div className="prompt-modal">
-            <div className="prompt-title prompt-title-row">
-              <IconLetterCount size={18} color="currentColor" />
-              {letterCountPrompt.askerName} wants to know:
-            </div>
-            <div className="prompt-question">
-              How many "<strong>{letterCountPrompt.letter}</strong>" letters are
-              in your word?
-            </div>
-            <div className="prompt-count-row">
-              <input
-                type="number"
-                min={0}
-                max={20}
-                className="fun-input"
-                style={{ width: 80, textAlign: "center" }}
-                value={letterCountInput}
-                onChange={(e) => setLetterCountInput(e.target.value)}
-                onKeyDown={(e) =>
-                  e.key === "Enter" && handleAnswerLetterCount()
-                }
-                placeholder="0"
-              />
-              <button
-                className="btn-fun btn-fun-yellow"
-                onClick={handleAnswerLetterCount}
-                disabled={letterCountInput === ""}
-              >
-                Submit
-              </button>
-            </div>
+            {!letterAskPrompt && letterCountPrompt && (
+              <div className="prompt-modal">
+                <div
+                  className="prompt-title prompt-title-row"
+                  id="letter-count-dialog-title"
+                >
+                  <IconLetterCount size={18} color="currentColor" />
+                  {letterCountPrompt.askerName} wants to know:
+                </div>
+                <div className="prompt-question">
+                  How many "<strong>{letterCountPrompt.letter}</strong>" letters
+                  are in your word?
+                </div>
+                <div className="prompt-count-row">
+                  <input
+                    type="number"
+                    min={0}
+                    max={20}
+                    className="fun-input prompt-count-input"
+                    value={letterCountInput}
+                    onChange={(e) => setLetterCountInput(e.target.value)}
+                    onKeyDown={(e) =>
+                      e.key === "Enter" && handleAnswerLetterCount()
+                    }
+                    placeholder="0"
+                    autoFocus
+                  />
+                  <button
+                    className="btn-fun btn-fun-yellow prompt-submit-btn"
+                    onClick={handleAnswerLetterCount}
+                    disabled={letterCountInput === ""}
+                  >
+                    Submit
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1227,7 +1248,7 @@ function GameScreen({
 
         {/* Action panel */}
         <div className={`action-card ${!isMyTurn ? "disabled" : ""}`}>
-          {!isMyTurn && !letterAskPrompt && !letterCountPrompt && (
+          {!isMyTurn && (
             <div className="waiting-msg">
               <span className="pulse-dot" />
               Waiting for {opponent?.username || "opponent"}...

@@ -1765,8 +1765,10 @@ input {
   inset: 0;
   z-index: 50;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 14px;
   padding: max(18px, env(safe-area-inset-top))
     max(14px, env(safe-area-inset-right))
     max(18px, env(safe-area-inset-bottom))
@@ -1785,9 +1787,57 @@ input {
   }
 }
 
+.prompt-secret-panel {
+  width: min(420px, 100%);
+  background: linear-gradient(145deg, rgba(13, 42, 26, 0.96), rgba(21, 53, 32, 0.96));
+  border: 2.5px solid rgba(105, 255, 71, 0.55);
+  border-radius: var(--radius);
+  padding: 14px 18px;
+  text-align: center;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.44);
+  animation: prompt-appear 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.prompt-secret-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-bottom: 7px;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  color: var(--green);
+  text-transform: uppercase;
+}
+
+.prompt-secret-text {
+  font-family: var(--font-display);
+  font-size: 2.1rem;
+  line-height: 1.05;
+  color: var(--green);
+  text-shadow: 0 0 18px rgba(105, 255, 71, 0.45);
+  overflow-wrap: anywhere;
+  text-transform: uppercase;
+}
+
+.prompt-secret-count {
+  margin-top: 7px;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  color: var(--green);
+  opacity: 0.72;
+  text-transform: uppercase;
+}
+
+@media (max-width: 420px) {
+  .prompt-secret-text {
+    font-size: 1.6rem;
+  }
+}
+
 .prompt-modal {
   width: min(420px, 100%);
-  max-height: min(88vh, 520px);
+  max-height: min(70vh, 520px);
   overflow-y: auto;
   background: linear-gradient(
     135deg,

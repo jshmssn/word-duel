@@ -613,6 +613,15 @@ input {
   font-size: 1.1rem;
   color: var(--text);
   flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.player-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 3px;
 }
 
 .you-tag {
@@ -625,7 +634,27 @@ input {
   letter-spacing: 1px;
 }
 
+.wins-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255, 225, 53, 0.12);
+  border: 1.5px solid rgba(255, 225, 53, 0.35);
+  color: var(--yellow);
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  letter-spacing: 1px;
+}
+
 .ready-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
   font-family: var(--font-display);
   font-size: 0.8rem;
   letter-spacing: 1px;
@@ -778,6 +807,28 @@ input {
 /* ══════════════════════════════════════════
    CHAT PANEL
 ══════════════════════════════════════════ */
+.waiting-log-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.waiting-log-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  color: var(--cyan);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.waiting-room-log {
+  max-height: 150px;
+}
+
 .chat-panel {
   background: var(--bg2);
   border: 3px solid var(--card-border);
@@ -1156,6 +1207,52 @@ input {
   }
 }
 
+.confirmed-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.confirmed-summary-text {
+  min-width: 0;
+  flex: 1;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  color: var(--cyan);
+  letter-spacing: 2px;
+  overflow-wrap: anywhere;
+}
+
+.shuffle-confirmed-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 6px 10px;
+  border-radius: 9px;
+  background: rgba(255, 225, 53, 0.12);
+  border: 2px solid rgba(255, 225, 53, 0.35);
+  color: var(--yellow);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  letter-spacing: 1px;
+}
+
+.shuffle-confirmed-btn:hover:not(:disabled) {
+  background: rgba(255, 225, 53, 0.2);
+  border-color: var(--yellow);
+  transform: translateY(-1px);
+}
+
+.shuffle-confirmed-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* Alphabet grid */
 .alpha-section {
   background: var(--bg2);
@@ -1404,6 +1501,11 @@ input {
   background: rgba(255, 112, 67, 0.08);
   color: var(--orange);
 }
+.log-row.warn {
+  border-color: var(--yellow);
+  background: rgba(255, 225, 53, 0.08);
+  color: var(--yellow);
+}
 .log-row.info {
   border-color: var(--muted);
   color: var(--muted);
@@ -1501,6 +1603,54 @@ input {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+.gameover-scoreboard {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.score-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg3);
+  border: 2px solid var(--border);
+  color: var(--text);
+}
+
+.score-row.round-winner {
+  border-color: rgba(255, 225, 53, 0.65);
+  background: rgba(255, 225, 53, 0.12);
+}
+
+.score-name,
+.score-wins {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.score-name {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.score-wins {
+  gap: 5px;
+  flex: 0 0 auto;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  color: var(--yellow);
+  letter-spacing: 1px;
 }
 
 .reveal-words {
@@ -1888,6 +2038,11 @@ input {
   letter-spacing: 4px;
 }
 
+.prompt-letter-badge-count {
+  color: var(--cyan);
+  text-shadow: 0 0 22px rgba(0, 229, 255, 0.65);
+}
+
 .prompt-question {
   font-family: var(--font-body);
   font-size: 1rem;
@@ -2226,6 +2381,11 @@ body,
   .gameover-btns {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .score-row {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .gameover-btns .btn-fun {

@@ -28,8 +28,8 @@ import {
   IconHourglass,
 } from "./icons/Icons.jsx";
 
-const SERVER_URL = "word-duel-server-production.up.railway.app";
-// const SERVER_URL = "localhost:3001";
+// const SERVER_URL = "word-duel-server-production.up.railway.app";
+const SERVER_URL = "localhost:3001";
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 const AVATAR_COLORS = [
@@ -106,9 +106,22 @@ function playTone(
 
 const SFX = {
   yourTurn() {
-    playTone(523, "sine", 0.1, 0.3);
-    playTone(659, "sine", 0.12, 0.3, getAudioCtx().currentTime + 0.12);
-    playTone(784, "sine", 0.18, 0.35, getAudioCtx().currentTime + 0.25);
+    try {
+      const ctx = getAudioCtx();
+      const start = ctx.currentTime;
+      playTone(523, "sine", 0.1, 0.3, start);
+      playTone(659, "sine", 0.12, 0.3, start + 0.12);
+      playTone(784, "sine", 0.18, 0.35, start + 0.25);
+      SFX.ding(start + 0.48);
+    } catch {}
+  },
+  ding(startTime = null) {
+    try {
+      const ctx = getAudioCtx();
+      const start = startTime !== null ? startTime : ctx.currentTime;
+      playTone(1175, "triangle", 0.12, 0.32, start);
+      playTone(1568, "sine", 0.1, 0.22, start + 0.08);
+    } catch {}
   },
   win() {
     const ctx = getAudioCtx();
@@ -277,6 +290,27 @@ function TurnTimer({ remaining, total, isMyTurn }) {
 }
 
 // ─── Lobby ───────────────────────────────────────────────────────────────────
+function GameLogPanel({ log = [], emptyContent, className = "" }) {
+  const logBoxRef = useRef(null);
+
+  useEffect(() => {
+    const box = logBoxRef.current;
+    if (box) box.scrollTop = box.scrollHeight;
+  }, [log]);
+
+  return (
+    <div className={`game-log ${className}`} ref={logBoxRef}>
+      {log.length === 0 && emptyContent}
+      {log.map((entry, i) => (
+        <div key={i} className={`log-row ${entry.type}`}>
+          <span className="log-icon">{entry.icon}</span>
+          {entry.text}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function LobbyScreen({ onCreated, onJoined }) {
   const [username, setUsername] = useState("");
   const [joinCode, setJoinCode] = useState("");
@@ -491,6 +525,7 @@ function WaitingScreen({
   code,
   players,
   myId,
+  gameLogs,
   chatMessages,
   onChat,
   onGameStart,
@@ -644,11 +679,19 @@ function WaitingScreen({
                   <div className="player-name-fun">
                     {p ? p.username : "Waiting..."}
                   </div>
-                  {p?.id === myId && (
-                    <span className="you-tag">
-                      <IconReturnArrow size={11} color="currentColor" />
-                      that's you!
-                    </span>
+                  {p && (
+                    <div className="player-meta-row">
+                      {p.id === myId && (
+                        <span className="you-tag">
+                          <IconReturnArrow size={11} color="currentColor" />
+                          that's you!
+                        </span>
+                      )}
+                      <span className="wins-chip">
+                        <IconTrophy size={12} color="currentColor" />
+                        {p.wins || 0} win{(p.wins || 0) === 1 ? "" : "s"}
+                      </span>
+                    </div>
                   )}
                 </div>
                 {p ? (
@@ -733,6 +776,25 @@ function WaitingScreen({
               Both players must be ready to start!
             </div>
           )}
+
+        <div className="waiting-log-section">
+          <div className="waiting-log-title">
+            <IconChat size={16} color="currentColor" />
+            Game Logs
+          </div>
+          <GameLogPanel
+            log={gameLogs}
+            className="waiting-room-log"
+            emptyContent={
+              <div className="log-row info">
+                <span className="log-icon">
+                  <IconHourglass size={14} color="currentColor" />
+                </span>
+                Game logs will appear here.
+              </div>
+            }
+          />
+        </div>
       </div>
 
       <FloatingChat
@@ -751,6 +813,8 @@ function WaitingScreen({
 function GameScreen({
   gameState,
   myId,
+  gameLogs,
+  setGameLogs,
   onGameOver,
   onReturnToWaiting,
   chatMessages,
@@ -768,7 +832,6 @@ function GameScreen({
   const [activeTab, setActiveTab] = useState("ask");
   const [letterInput, setLetterInput] = useState("");
   const [guessInput, setGuessInput] = useState("");
-  const [log, setLog] = useState([]);
   const [confirmedLetters, setConfirmedLetters] = useState([]);
   const [askedLetters, setAskedLetters] = useState({});
   const [turn, setTurn] = useState(currentTurn);
@@ -788,17 +851,23 @@ function GameScreen({
   // Disconnection
   const [opponentLeft, setOpponentLeft] = useState(false);
 
-  const logEndRef = useRef(null);
   const prevMsgCount = useRef(chatMessages.length);
   const prevRemaining = useRef(turnDuration || 0);
+  const initialTurnSoundPlayed = useRef(false);
 
   const isMyTurn = turn === myId;
   const opponent = players.find((p) => p.id !== myId);
 
-  const addLog = useCallback((entry) => setLog((prev) => [...prev, entry]), []);
+  const addLog = useCallback(
+    (entry) => setGameLogs((prev) => [...prev, entry]),
+    [setGameLogs],
+  );
+
   useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [log]);
+    if (initialTurnSoundPlayed.current || currentTurn !== myId) return;
+    initialTurnSoundPlayed.current = true;
+    SFX.yourTurn();
+  }, [currentTurn, myId]);
 
   // Chat unread tracking
   useEffect(() => {
@@ -945,6 +1014,11 @@ function GameScreen({
     sock.on("game-over", (data) => {
       if (data.winnerId === myId) SFX.win();
       else SFX.lose();
+      addLog({
+        type: "yes",
+        icon: <IconTrophy size={14} color="currentColor" />,
+        text: `${data.winnerName} guessed the word and wins the round!`,
+      });
       onGameOver(data);
     });
 
@@ -1012,6 +1086,19 @@ function GameScreen({
   const handleChatToggle = () => {
     setChatOpen((o) => !o);
     setUnread(0);
+  };
+
+  const handleShuffleConfirmedLetters = () => {
+    setConfirmedLetters((prev) => {
+      if (prev.length < 2) return prev;
+      const next = [...prev];
+      for (let i = next.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [next[i], next[j]] = [next[j], next[i]];
+      }
+      return next;
+    });
+    SFX.confirm();
   };
 
   return (
@@ -1140,6 +1227,9 @@ function GameScreen({
                   <IconLetterCount size={18} color="currentColor" />
                   {letterCountPrompt.askerName} wants to know:
                 </div>
+                <div className="prompt-letter-badge prompt-letter-badge-count">
+                  {letterCountPrompt.letter}
+                </div>
                 <div className="prompt-question">
                   How many "<strong>{letterCountPrompt.letter}</strong>" letters
                   are in your word?
@@ -1211,15 +1301,19 @@ function GameScreen({
               })}
             </div>
             {confirmedLetters.length > 0 && (
-              <div
-                style={{
-                  fontFamily: "var(--font-display)",
-                  fontSize: "0.75rem",
-                  color: "var(--cyan)",
-                  letterSpacing: "2px",
-                }}
-              >
-                GOT: {confirmedLetters.join("  ")}
+              <div className="confirmed-summary-row">
+                <div className="confirmed-summary-text">
+                  GOT: {confirmedLetters.join("  ")}
+                </div>
+                <button
+                  className="shuffle-confirmed-btn"
+                  onClick={handleShuffleConfirmedLetters}
+                  disabled={confirmedLetters.length < 2}
+                  title="Shuffle confirmed letters"
+                >
+                  <IconDice size={15} color="currentColor" />
+                  Shuffle
+                </button>
               </div>
             )}
           </div>
@@ -1399,8 +1493,9 @@ function GameScreen({
         </div>
 
         {/* Log */}
-        <div className="game-log">
-          {log.length === 0 && (
+        <GameLogPanel
+          log={gameLogs}
+          emptyContent={
             <div className="log-row info">
               <span className="log-icon">
                 {isMyTurn ? (
@@ -1413,15 +1508,8 @@ function GameScreen({
                 ? "It's your turn - ask a letter or guess!"
                 : `${opponent?.username} goes first!`}
             </div>
-          )}
-          {log.map((entry, i) => (
-            <div key={i} className={`log-row ${entry.type}`}>
-              <span className="log-icon">{entry.icon}</span>
-              {entry.text}
-            </div>
-          ))}
-          <div ref={logEndRef} />
-        </div>
+          }
+        />
       </div>
 
       <FloatingChat
@@ -1439,6 +1527,7 @@ function GameScreen({
 // ─── Game Over ────────────────────────────────────────────────────────────────
 function GameOverScreen({ result, myId, onRematch, chatMessages, onChat }) {
   const isWinner = result.winnerId === myId;
+  const resultPlayers = Array.isArray(result.players) ? result.players : [];
   const [chatOpen, setChatOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const prevMsgCount = useRef(chatMessages.length);
@@ -1491,6 +1580,26 @@ function GameOverScreen({ result, myId, onRematch, chatMessages, onChat }) {
             ? "You cracked the code!"
             : `${result.winnerName} got it first!`}
         </div>
+
+        {resultPlayers.length > 0 && (
+          <div className="gameover-scoreboard">
+            {resultPlayers.map((player) => (
+              <div
+                key={player.id}
+                className={`score-row ${player.id === result.winnerId ? "round-winner" : ""}`}
+              >
+                <span className="score-name">
+                  {player.username}
+                  {player.id === myId ? " (you)" : ""}
+                </span>
+                <span className="score-wins">
+                  <IconTrophy size={15} color="currentColor" />
+                  {player.wins || 0} win{(player.wins || 0) === 1 ? "" : "s"}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="reveal-words">
           <div className="reveal-box">
@@ -1545,6 +1654,7 @@ export default function App() {
   const [players, setPlayers] = useState([]);
   const [gameState, setGameState] = useState(null);
   const [gameOverResult, setGameOverResult] = useState(null);
+  const [gameLogs, setGameLogs] = useState([]);
   const [chatMessages, setChatMessages] = useState([]);
   const [turnDuration, setTurnDuration] = useState(0);
   const [creatorId, setCreatorId] = useState(null);
@@ -1595,6 +1705,7 @@ export default function App() {
     const handleGameStartEvent = (data) => {
       setGameState((prev) => ({ ...data, code: roomCode || prev?.code }));
       if (data.turnDuration !== undefined) setTurnDuration(data.turnDuration);
+      setGameLogs([]);
       setScreen("game");
       addSystemChat("Game started! Good luck!");
     };
@@ -1647,19 +1758,26 @@ export default function App() {
     setRoomCode(code);
     setTurnDuration(td || 0);
     setCreatorId(cid || getSocket().id);
-    setPlayers([{ id: getSocket().id, username, ready: false }]);
+    setPlayers([{ id: getSocket().id, username, ready: false, wins: 0 }]);
+    setGameLogs([]);
     setScreen("waiting");
   };
 
   const handleRoomJoined = (code) => {
     setRoomCode(code);
+    setGameLogs([]);
     setScreen("waiting");
   };
 
   const handleGameOver = (result) => {
     setGameOverResult(result);
     setScreen("gameover");
-    addSystemChat(`${result.winnerName} wins the round!`);
+    const winnerWins =
+      result.players?.find((p) => p.id === result.winnerId)?.wins ??
+      result.winnerWins;
+    addSystemChat(
+      `${result.winnerName} wins the round${winnerWins !== undefined ? ` (${winnerWins} total win${winnerWins === 1 ? "" : "s"})` : ""}!`,
+    );
   };
 
   const handleReturnToWaiting = useCallback(() => {
@@ -1685,6 +1803,7 @@ export default function App() {
     (data) => {
       setGameState((prev) => ({ ...data, code: roomCode || prev?.code }));
       if (data.turnDuration !== undefined) setTurnDuration(data.turnDuration);
+      setGameLogs([]);
       setScreen("game");
     },
     [roomCode],
@@ -1700,6 +1819,7 @@ export default function App() {
         code={roomCode}
         players={players}
         myId={myId}
+        gameLogs={gameLogs}
         chatMessages={chatMessages}
         onChat={handleChat}
         onGameStart={handleGameStart}
@@ -1713,6 +1833,8 @@ export default function App() {
       <GameScreen
         gameState={{ ...gameState, code: roomCode, turnDuration }}
         myId={myId}
+        gameLogs={gameLogs}
+        setGameLogs={setGameLogs}
         onGameOver={handleGameOver}
         onReturnToWaiting={handleReturnToWaiting}
         chatMessages={chatMessages}

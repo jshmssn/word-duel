@@ -29,8 +29,8 @@ import {
   IconHourglass,
 } from "./icons/Icons.jsx";
 
-const SERVER_URL = "word-duel-server-production.up.railway.app";
-// const SERVER_URL = "localhost:3001";
+// const SERVER_URL = "word-duel-server-production.up.railway.app";
+const SERVER_URL = "localhost:3001";
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 const AVATAR_COLORS = [
@@ -754,24 +754,24 @@ function WaitingScreen({
                 >
                   {p ? p.username[0].toUpperCase() : "?"}
                 </div>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="player-name-fun">
-                    {p ? p.username : "Waiting..."}
+                    <span>{p ? p.username : "Waiting..."}</span>
+                    {p?.id === myId && (
+                      <span className="you-tag">
+                        <IconReturnArrow size={11} color="currentColor" />
+                        that's you!
+                      </span>
+                    )}
+                    {p?.isBot && (
+                      <span className="you-tag">
+                        <IconTarget size={11} color="currentColor" />
+                        bot
+                      </span>
+                    )}
                   </div>
                   {p && (
                     <div className="player-meta-row">
-                      {p.id === myId && (
-                        <span className="you-tag">
-                          <IconReturnArrow size={11} color="currentColor" />
-                          that's you!
-                        </span>
-                      )}
-                      {p.isBot && (
-                        <span className="you-tag">
-                          <IconTarget size={11} color="currentColor" />
-                          bot
-                        </span>
-                      )}
                       <span className="wins-chip">
                         <IconTrophy size={12} color="currentColor" />
                         {p.wins || 0} win{(p.wins || 0) === 1 ? "" : "s"}

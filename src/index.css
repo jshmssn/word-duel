@@ -586,9 +586,6 @@ input {
   box-shadow: var(--shadow-card);
 }
 
-.player-card.filled {
-  border-color: var(--green);
-}
 .player-card.filled.ready-yes {
   border-color: var(--green);
   box-shadow:
@@ -620,6 +617,16 @@ input {
   font-size: 1.1rem;
   color: var(--text);
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.player-name-fun > span:first-child {
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 

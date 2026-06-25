@@ -44,10 +44,14 @@ const ACCENTS = [
   "#bcff4f",
 ];
 
+const SHUFFLE_EMOJIS = ["🎲", "❓", "⚡", "🌟", "🎯", "🌀", "✨", "🔮"];
+
 const REEL_HEIGHT = 286;
 const ROW_HEIGHT = 58;
 const FINAL_CYCLE = 5;
 const SPIN_DURATION = 2800;
+const INTRO_DURATION = 760;
+const INTRO_ACCENT = "#c77dff";
 
 function normalizeName(name) {
   return String(name || "").trim().toLowerCase();
@@ -66,7 +70,9 @@ function playSlotTone(freq, type, duration, vol, startTime = null) {
 
   try {
     tone(freq, type, duration, vol, startTime);
-  } catch {}
+  } catch {
+    // Audio should never break the game.
+  }
 }
 
 function getSlotAudioCtx() {
@@ -90,7 +96,9 @@ function playFightFanfare() {
 
   try {
     if (typeof sfx?.yourTurn === "function") sfx.yourTurn();
-  } catch {}
+  } catch {
+    // Ignore unavailable audio.
+  }
 }
 
 export default function SlotMachine({ selectedCategoryName, onDone }) {
@@ -99,6 +107,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
   const [landed, setLanded] = useState(false);
   const [resultVisible, setResultVisible] = useState(false);
   const [countdown, setCountdown] = useState(null);
+  const [shuffleEmoji, setShuffleEmoji] = useState("❓");
 
   const onDoneRef = useRef(onDone);
   const doneCalledRef = useRef(false);
@@ -117,6 +126,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
 
   const selectedCategory = CATEGORIES[selectedIndex] || CATEGORIES[0];
   const accent = ACCENTS[selectedIndex % ACCENTS.length];
+  const activeAccent = phase === "intro" ? INTRO_ACCENT : accent;
 
   const centerOffset = REEL_HEIGHT / 2 - ROW_HEIGHT / 2;
   const finalIndex = FINAL_CYCLE * CATEGORIES.length + selectedIndex;
@@ -149,6 +159,10 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
 
       timeouts.push(id);
       return id;
+    };
+
+    const clearAllIntervals = () => {
+      intervals.forEach((id) => window.clearInterval(id));
     };
 
     const playLand = () => {
@@ -194,6 +208,14 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
     setLanded(false);
     setResultVisible(false);
     setCountdown(null);
+    setShuffleEmoji("❓");
+
+    const shuffleEmojiInterval = window.setInterval(() => {
+      const randomIndex = Math.floor(Math.random() * SHUFFLE_EMOJIS.length);
+      setShuffleEmoji(SHUFFLE_EMOJIS[randomIndex]);
+    }, 120);
+
+    intervals.push(shuffleEmojiInterval);
 
     schedule(() => {
       if (cancelled) return;
@@ -205,7 +227,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
 
       const tickInterval = window.setInterval(() => {
         playSlotTone(920 + Math.random() * 180, "square", 0.03, 0.09);
-      }, 160);
+      }, 170);
 
       intervals.push(tickInterval);
 
@@ -214,7 +236,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
       }, 80);
 
       schedule(() => {
-        intervals.forEach((id) => window.clearInterval(id));
+        clearAllIntervals();
 
         setSpinTranslate(targetTranslate);
         setLanded(true);
@@ -224,13 +246,13 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
 
         schedule(startCountdown, 560);
       }, SPIN_DURATION + 140);
-    }, 760);
+    }, INTRO_DURATION);
 
     return () => {
       cancelled = true;
 
       timeouts.forEach((id) => window.clearTimeout(id));
-      intervals.forEach((id) => window.clearInterval(id));
+      clearAllIntervals();
     };
   }, [selectedCategoryName, selectedIndex, startTranslate, targetTranslate]);
 
@@ -344,13 +366,23 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
       <style>
         {`
           @keyframes slotOverlayFade {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            from {
+              opacity: 0;
+            }
+
+            to {
+              opacity: 1;
+            }
           }
 
           @keyframes slotRainbowSlide {
-            from { background-position: 0% 50%; }
-            to { background-position: 300% 50%; }
+            from {
+              background-position: 0% 50%;
+            }
+
+            to {
+              background-position: 300% 50%;
+            }
           }
 
           @keyframes slotPulse {
@@ -358,6 +390,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
               opacity: 0.72;
               transform: scale(1);
             }
+
             50% {
               opacity: 1;
               transform: scale(1.035);
@@ -369,9 +402,11 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
               transform: translateX(-120%);
               opacity: 0;
             }
+
             20% {
               opacity: 1;
             }
+
             100% {
               transform: translateX(120%);
               opacity: 0;
@@ -383,6 +418,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
               opacity: 0;
               transform: translateY(18px) scale(0.96);
             }
+
             100% {
               opacity: 1;
               transform: translateY(0) scale(1);
@@ -394,10 +430,12 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
               opacity: 0;
               transform: translateY(16px) scale(0.92);
             }
+
             72% {
               opacity: 1;
               transform: translateY(-2px) scale(1.03);
             }
+
             100% {
               opacity: 1;
               transform: translateY(0) scale(1);
@@ -409,10 +447,12 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
               opacity: 0;
               transform: scale(0.45) rotate(-8deg);
             }
+
             62% {
               opacity: 1;
               transform: scale(1.16) rotate(2deg);
             }
+
             100% {
               opacity: 1;
               transform: scale(1) rotate(0deg);
@@ -420,6 +460,22 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
           }
 
           @media (max-width: 480px) {
+            .slot-machine-card {
+              padding: 18px 12px 14px !important;
+              border-radius: 22px !important;
+            }
+
+            .slot-machine-header {
+              font-size: 0.98rem !important;
+              padding: 7px 14px !important;
+              margin-bottom: 12px !important;
+            }
+
+            .slot-machine-reel {
+              height: 260px !important;
+              border-radius: 18px !important;
+            }
+
             .slot-machine-result-card {
               padding-left: 12px !important;
               padding-right: 12px !important;
@@ -432,16 +488,24 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
               padding-right: 12px !important;
             }
           }
+
+          @media (prefers-reduced-motion: reduce) {
+            .slot-machine-reel-track {
+              transition-duration: 900ms !important;
+            }
+          }
         `}
       </style>
 
-      <div style={cardStyle}>
+      <div className="slot-machine-card" style={cardStyle}>
         <div style={shimmerStripStyle("top")} />
         <div style={shimmerStripStyle("bottom")} />
 
-        <div style={headerStyle}>⚔️ Category Roulette ⚔️</div>
+        <div className="slot-machine-header" style={headerStyle}>
+          ⚔️ Category Roulette ⚔️
+        </div>
 
-        <div style={reelStyle}>
+        <div className="slot-machine-reel" style={reelStyle}>
           <div
             style={{
               position: "absolute",
@@ -523,15 +587,15 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
 
                 <div
                   style={{
-                    color: accent,
+                    color: INTRO_ACCENT,
                     fontFamily: "var(--font-display)",
                     fontSize: "clamp(2rem, 10vw, 3.8rem)",
                     lineHeight: 1,
-                    textShadow: `0 0 24px ${accent}88`,
+                    textShadow: `0 0 24px ${INTRO_ACCENT}88`,
                     animation: "slotPulse 900ms ease-in-out infinite",
                   }}
                 >
-                  {selectedCategory.emoji}
+                  {shuffleEmoji}
                 </div>
 
                 <div
@@ -553,6 +617,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
 
           {phase !== "intro" && (
             <div
+              className="slot-machine-reel-track"
               style={{
                 position: "absolute",
                 left: 0,
@@ -564,7 +629,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
                   phase === "spin"
                     ? `transform ${SPIN_DURATION}ms cubic-bezier(0.08, 0.82, 0.18, 1)`
                     : "none",
-                willChange: "transform",
+                willChange: phase === "spin" ? "transform" : "auto",
                 zIndex: 1,
               }}
             >
@@ -611,6 +676,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
                     }}
                   >
                     <span style={{ fontSize: "1.18em" }}>{item.emoji}</span>
+
                     <span
                       style={{
                         minWidth: 0,

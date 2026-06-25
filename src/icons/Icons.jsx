@@ -141,6 +141,19 @@ export function IconQuestion({ size = 24, color = "currentColor" }) {
   );
 }
 
+export function IconLetterCount({ size = 24, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+      <rect x="7" y="7" width="34" height="34" rx="8" stroke={color} strokeWidth="3" fill={color} fillOpacity="0.1"/>
+      <path d="M15 16H21M15 24H24M15 32H19" stroke={color} strokeWidth="3" strokeLinecap="round"/>
+      <circle cx="31" cy="18" r="4" stroke={color} strokeWidth="2.5" fill={color} fillOpacity="0.16"/>
+      <path d="M34 21L38 25" stroke={color} strokeWidth="2.5" strokeLinecap="round"/>
+      <path d="M29 31H36" stroke={color} strokeWidth="3" strokeLinecap="round"/>
+      <path d="M32.5 27.5V34.5" stroke={color} strokeWidth="3" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
 export function IconLightning({ size = 24, color = "currentColor" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
@@ -174,6 +187,94 @@ export function IconStar2({ size = 16, color = "currentColor" }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
       <path d="M12 2L14.4 9.2H22L16 13.8L18.4 21L12 16.4L5.6 21L8 13.8L2 9.2H9.6L12 2Z"/>
+    </svg>
+  );
+}
+
+export function IconHome({ size = 24, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+      <path d="M8 23L24 10L40 23" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M13 22V39H35V22" stroke={color} strokeWidth="3" strokeLinejoin="round" fill={color} fillOpacity="0.12"/>
+      <path d="M20 39V28H28V39" stroke={color} strokeWidth="3" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+export function IconRocket({ size = 24, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+      <path d="M28 7C35 8 40 13 41 20L29 32L16 19L28 7Z" stroke={color} strokeWidth="3" strokeLinejoin="round" fill={color} fillOpacity="0.16"/>
+      <circle cx="31" cy="17" r="4" stroke={color} strokeWidth="2.5" fill={color} fillOpacity="0.2"/>
+      <path d="M17 30L11 36M13 25L8 27L12 31M23 35L21 40L17 36" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+export function IconLetters({ size = 24, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+      <rect x="7" y="9" width="15" height="15" rx="4" stroke={color} strokeWidth="3" fill={color} fillOpacity="0.12"/>
+      <rect x="26" y="24" width="15" height="15" rx="4" stroke={color} strokeWidth="3" fill={color} fillOpacity="0.12"/>
+      <path d="M12 20L14.5 13L17 20M13 18H16" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M31 29H35C37 29 38 30 38 32C38 34 37 35 35 35H31V29ZM31 35H35.5" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+export function IconBulb({ size = 24, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+      <path d="M24 7C17.5 7 13 11.5 13 17.5C13 21.5 15 24.5 18 27V31H30V27C33 24.5 35 21.5 35 17.5C35 11.5 30.5 7 24 7Z" stroke={color} strokeWidth="3" strokeLinejoin="round" fill={color} fillOpacity="0.14"/>
+      <path d="M19 36H29M20 41H28M24 2V4M39 9L37 11M9 9L11 11" stroke={color} strokeWidth="3" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+export function IconClock({ size = 24, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+      <circle cx="24" cy="24" r="17" stroke={color} strokeWidth="3" fill={color} fillOpacity="0.1"/>
+      <path d="M24 14V25L31 29" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M15 6L9 11M33 6L39 11" stroke={color} strokeWidth="3" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+export function IconWarning({ size = 24, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+      <path d="M24 7L43 40H5L24 7Z" stroke={color} strokeWidth="3" strokeLinejoin="round" fill={color} fillOpacity="0.12"/>
+      <path d="M24 18V28" stroke={color} strokeWidth="3" strokeLinecap="round"/>
+      <circle cx="24" cy="34" r="2.5" fill={color}/>
+    </svg>
+  );
+}
+
+export function IconBoom({ size = 24, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+      <path d="M24 5L28 17L41 12L34 24L43 34L30 33L24 43L18 33L5 34L14 24L7 12L20 17L24 5Z" stroke={color} strokeWidth="3" strokeLinejoin="round" fill={color} fillOpacity="0.16"/>
+      <path d="M19 24H29" stroke={color} strokeWidth="3" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
+export function IconReturnArrow({ size = 24, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+      <path d="M18 15L9 24L18 33" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M10 24H31C36 24 39 27 39 32C39 37 35 40 29 40H24" stroke={color} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
+export function IconHourglass({ size = 24, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" fill="none">
+      <path d="M14 7H34M14 41H34" stroke={color} strokeWidth="3" strokeLinecap="round"/>
+      <path d="M17 7V16C17 20 20 22 24 24C20 26 17 28 17 32V41H31V32C31 28 28 26 24 24C28 22 31 20 31 16V7H17Z" stroke={color} strokeWidth="3" strokeLinejoin="round" fill={color} fillOpacity="0.1"/>
+      <path d="M20 35H28M21 15H27" stroke={color} strokeWidth="2.5" strokeLinecap="round"/>
     </svg>
   );
 }

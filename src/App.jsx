@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { io } from "socket.io-client";
+import SlotMachine from "./SlotMachine.jsx";
 import {
   IconSword,
   IconShield,
@@ -28,8 +29,8 @@ import {
   IconHourglass,
 } from "./icons/Icons.jsx";
 
-const SERVER_URL = "word-duel-server-production.up.railway.app";
-// const SERVER_URL = "localhost:3001";
+// const SERVER_URL = "word-duel-server-production.up.railway.app";
+const SERVER_URL = "localhost:3001";
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 const AVATAR_COLORS = [
@@ -158,6 +159,13 @@ const SFX = {
     playTone(880, "square", 0.06, 0.18);
   },
 };
+
+if (typeof window !== "undefined") {
+  window.wordDuelAudio = { playTone, getAudioCtx, SFX };
+  window.playTone = playTone;
+  window.getAudioCtx = getAudioCtx;
+  window.SFX = SFX;
+}
 
 // ─── Floating Chat Button ─────────────────────────────────────────────────────
 function FloatingChat({ messages, onSend, myId, isOpen, onToggle, unread }) {
@@ -534,6 +542,8 @@ function WaitingScreen({
   onTurnDurationChange,
 }) {
   const [countdown, setCountdown] = useState(null);
+  const [showSlotMachine, setShowSlotMachine] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState("");
   const [copied, setCopied] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [unread, setUnread] = useState(0);
@@ -568,22 +578,44 @@ function WaitingScreen({
     onTurnDurationChange(Number(event.target.value));
   };
 
+  const handleSlotMachineDone = useCallback(() => {
+    getSocket().emit("slot-machine-done", { code });
+  }, [code]);
+
   useEffect(() => {
     const sock = getSocket();
-    const handleCountdown = ({ count }) => setCountdown(count);
-    const handleCountdownCancel = () => setCountdown(null);
+    const handleCountdown = ({ count }) => {
+      const nextCount = Number(count);
+      setCountdown(nextCount > 0 ? nextCount : null);
+    };
+    const handleCountdownCancel = () => {
+      setCountdown(null);
+      setShowSlotMachine(false);
+      setSelectedCategory("");
+    };
+    const handleCategorySelected = ({ category, selectedCategoryName }) => {
+      const nextCategory = selectedCategoryName || category;
+      if (!nextCategory) return;
+      setCountdown(null);
+      setSelectedCategory(nextCategory);
+      setShowSlotMachine(true);
+    };
     const handleGameStart = (data) => {
       setCountdown(null);
+      setShowSlotMachine(false);
+      setSelectedCategory("");
       onGameStart(data);
     };
 
     sock.on("countdown", handleCountdown);
     sock.on("countdown-cancel", handleCountdownCancel);
+    sock.on("category-selected", handleCategorySelected);
     sock.on("game-start", handleGameStart);
 
     return () => {
       sock.off("countdown", handleCountdown);
       sock.off("countdown-cancel", handleCountdownCancel);
+      sock.off("category-selected", handleCategorySelected);
       sock.off("game-start", handleGameStart);
     };
   }, [onGameStart]);
@@ -724,6 +756,13 @@ function WaitingScreen({
               Game Starting!
             </div>
           </div>
+        )}
+
+        {showSlotMachine && selectedCategory && (
+          <SlotMachine
+            selectedCategoryName={selectedCategory}
+            onDone={handleSlotMachineDone}
+          />
         )}
 
         {hasTwoPlayers && (
@@ -1170,29 +1209,34 @@ function GameScreen({
                 : "letter-count-dialog-title"
             }
           >
-            <div className="prompt-secret-panel" aria-label="Your secret word">
-              <div className="prompt-secret-label">
-                <IconShield size={16} color="currentColor" />
-                Your Secret Word
-              </div>
-              <div className="prompt-secret-text">{myWord.toUpperCase()}</div>
-              <div className="prompt-secret-count">{myWordLetterCount} letters</div>
-            </div>
-
             {letterAskPrompt && (
-              <div className="prompt-modal">
+              <div className="prompt-modal prompt-decision-modal">
+                <div className="prompt-kicker">Opponent Question</div>
                 <div
                   className="prompt-title prompt-title-row"
                   id="letter-ask-dialog-title"
                 >
                   <IconLetters size={18} color="currentColor" />
-                  {letterAskPrompt.askerName} asked for the letter:
+                  {letterAskPrompt.askerName} asked about this letter
                 </div>
                 <div className="prompt-letter-badge">
                   {letterAskPrompt.letter}
                 </div>
                 <div className="prompt-question">
-                  Is "<strong>{letterAskPrompt.letter}</strong>" in your word?
+                  Does your secret word contain{" "}
+                  <strong>{letterAskPrompt.letter}</strong>?
+                </div>
+                <div className="prompt-secret-strip" aria-label="Your secret word">
+                  <span className="prompt-secret-strip-label">
+                    <IconShield size={14} color="currentColor" />
+                    Your word
+                  </span>
+                  <span className="prompt-secret-strip-word">
+                    {myWord.toUpperCase()}
+                  </span>
+                  <span className="prompt-secret-strip-count">
+                    {myWordLetterCount} letters
+                  </span>
                 </div>
                 <div className="prompt-buttons">
                   <button
@@ -1219,20 +1263,34 @@ function GameScreen({
             )}
 
             {!letterAskPrompt && letterCountPrompt && (
-              <div className="prompt-modal">
+              <div className="prompt-modal prompt-decision-modal">
+                <div className="prompt-kicker">Opponent Question</div>
                 <div
                   className="prompt-title prompt-title-row"
                   id="letter-count-dialog-title"
                 >
                   <IconLetterCount size={18} color="currentColor" />
-                  {letterCountPrompt.askerName} wants to know:
+                  {letterCountPrompt.askerName} wants a letter count
                 </div>
                 <div className="prompt-letter-badge prompt-letter-badge-count">
                   {letterCountPrompt.letter}
                 </div>
                 <div className="prompt-question">
-                  How many "<strong>{letterCountPrompt.letter}</strong>" letters
-                  are in your word?
+                  How many times does{" "}
+                  <strong>{letterCountPrompt.letter}</strong> appear in your
+                  secret word?
+                </div>
+                <div className="prompt-secret-strip" aria-label="Your secret word">
+                  <span className="prompt-secret-strip-label">
+                    <IconShield size={14} color="currentColor" />
+                    Your word
+                  </span>
+                  <span className="prompt-secret-strip-word">
+                    {myWord.toUpperCase()}
+                  </span>
+                  <span className="prompt-secret-strip-count">
+                    {myWordLetterCount} letters
+                  </span>
                 </div>
                 <div className="prompt-count-row">
                   <input

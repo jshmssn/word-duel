@@ -1209,29 +1209,34 @@ function GameScreen({
                 : "letter-count-dialog-title"
             }
           >
-            <div className="prompt-secret-panel" aria-label="Your secret word">
-              <div className="prompt-secret-label">
-                <IconShield size={16} color="currentColor" />
-                Your Secret Word
-              </div>
-              <div className="prompt-secret-text">{myWord.toUpperCase()}</div>
-              <div className="prompt-secret-count">{myWordLetterCount} letters</div>
-            </div>
-
             {letterAskPrompt && (
-              <div className="prompt-modal">
+              <div className="prompt-modal prompt-decision-modal">
+                <div className="prompt-kicker">Opponent Question</div>
                 <div
                   className="prompt-title prompt-title-row"
                   id="letter-ask-dialog-title"
                 >
                   <IconLetters size={18} color="currentColor" />
-                  {letterAskPrompt.askerName} asked for the letter:
+                  {letterAskPrompt.askerName} asked about this letter
                 </div>
                 <div className="prompt-letter-badge">
                   {letterAskPrompt.letter}
                 </div>
                 <div className="prompt-question">
-                  Is "<strong>{letterAskPrompt.letter}</strong>" in your word?
+                  Does your secret word contain{" "}
+                  <strong>{letterAskPrompt.letter}</strong>?
+                </div>
+                <div className="prompt-secret-strip" aria-label="Your secret word">
+                  <span className="prompt-secret-strip-label">
+                    <IconShield size={14} color="currentColor" />
+                    Your word
+                  </span>
+                  <span className="prompt-secret-strip-word">
+                    {myWord.toUpperCase()}
+                  </span>
+                  <span className="prompt-secret-strip-count">
+                    {myWordLetterCount} letters
+                  </span>
                 </div>
                 <div className="prompt-buttons">
                   <button
@@ -1258,20 +1263,34 @@ function GameScreen({
             )}
 
             {!letterAskPrompt && letterCountPrompt && (
-              <div className="prompt-modal">
+              <div className="prompt-modal prompt-decision-modal">
+                <div className="prompt-kicker">Opponent Question</div>
                 <div
                   className="prompt-title prompt-title-row"
                   id="letter-count-dialog-title"
                 >
                   <IconLetterCount size={18} color="currentColor" />
-                  {letterCountPrompt.askerName} wants to know:
+                  {letterCountPrompt.askerName} wants a letter count
                 </div>
                 <div className="prompt-letter-badge prompt-letter-badge-count">
                   {letterCountPrompt.letter}
                 </div>
                 <div className="prompt-question">
-                  How many "<strong>{letterCountPrompt.letter}</strong>" letters
-                  are in your word?
+                  How many times does{" "}
+                  <strong>{letterCountPrompt.letter}</strong> appear in your
+                  secret word?
+                </div>
+                <div className="prompt-secret-strip" aria-label="Your secret word">
+                  <span className="prompt-secret-strip-label">
+                    <IconShield size={14} color="currentColor" />
+                    Your word
+                  </span>
+                  <span className="prompt-secret-strip-word">
+                    {myWord.toUpperCase()}
+                  </span>
+                  <span className="prompt-secret-strip-count">
+                    {myWordLetterCount} letters
+                  </span>
                 </div>
                 <div className="prompt-count-row">
                   <input

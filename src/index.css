@@ -45,6 +45,7 @@ body,
 #root {
   height: 100%;
   width: 100%;
+  overscroll-behavior-y: none;
 }
 
 body {
@@ -53,6 +54,7 @@ body {
   font-family: var(--font-body);
   min-height: 100vh;
   overflow-x: hidden;
+  overscroll-behavior-y: none;
 }
 
 /* Fun animated bg */
@@ -2245,6 +2247,45 @@ input {
   min-height: 58px;
   border-radius: 16px;
   font-size: 1.1rem;
+}
+
+.leave-match-overlay {
+  z-index: 10000;
+}
+
+.leave-match-modal {
+  width: min(440px, 100%);
+  gap: 14px;
+}
+
+.leave-match-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--yellow);
+  background: rgba(255, 225, 53, 0.12);
+  border: 2px solid rgba(255, 225, 53, 0.42);
+  box-shadow: 0 0 24px rgba(255, 225, 53, 0.18);
+}
+
+.leave-match-title {
+  font-size: clamp(1.25rem, 5vw, 1.65rem);
+}
+
+.leave-match-copy {
+  max-width: 34ch;
+  color: rgba(240, 232, 255, 0.82);
+  font-family: var(--font-ui);
+  font-size: 0.96rem;
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.leave-match-actions .btn-fun {
+  min-height: 54px;
 }
 
 .prompt-count-row {

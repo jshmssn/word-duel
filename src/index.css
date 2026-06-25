@@ -432,6 +432,13 @@ input {
   gap: 10px;
 }
 
+.create-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  width: 100%;
+}
+
 .error-bubble {
   background: rgba(255, 68, 68, 0.15);
   border: 2px solid rgba(255, 68, 68, 0.5);
@@ -579,9 +586,6 @@ input {
   box-shadow: var(--shadow-card);
 }
 
-.player-card.filled {
-  border-color: var(--green);
-}
 .player-card.filled.ready-yes {
   border-color: var(--green);
   box-shadow:
@@ -613,6 +617,16 @@ input {
   font-size: 1.1rem;
   color: var(--text);
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.player-name-fun > span:first-child {
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
@@ -1653,6 +1667,19 @@ input {
   letter-spacing: 1px;
 }
 
+.series-pill {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1.5px solid rgba(0, 229, 255, 0.35);
+  border-radius: 999px;
+  background: rgba(0, 229, 255, 0.08);
+  color: var(--cyan);
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  letter-spacing: 1px;
+  text-align: center;
+}
+
 .reveal-words {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1699,12 +1726,80 @@ input {
   text-shadow: 0 0 15px rgba(105, 255, 71, 0.4);
 }
 
+.animated-reveal-box {
+  min-height: 126px;
+}
+
+.reveal-tile-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+}
+
+.reveal-letter-tile {
+  width: clamp(28px, 7vw, 38px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  border: 2px solid var(--border);
+  background: rgba(42, 13, 74, 0.95);
+  color: var(--muted);
+  font-family: var(--font-display);
+  font-size: clamp(1.05rem, 5vw, 1.45rem);
+  line-height: 1;
+  transform: rotateX(72deg) scale(0.82);
+  opacity: 0.58;
+  transition:
+    transform 0.24s cubic-bezier(0.2, 1.2, 0.3, 1),
+    opacity 0.2s ease,
+    color 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.reveal-letter-tile.is-visible {
+  transform: rotateX(0deg) scale(1);
+  opacity: 1;
+}
+
+.animated-reveal-box.opp-word .reveal-letter-tile.is-visible {
+  color: var(--cyan);
+  border-color: rgba(0, 229, 255, 0.58);
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.36);
+}
+
+.animated-reveal-box.my-word .reveal-letter-tile.is-visible {
+  color: var(--green);
+  border-color: rgba(105, 255, 71, 0.58);
+  box-shadow: 0 0 14px rgba(105, 255, 71, 0.34);
+}
+
+.reveal-space {
+  width: 12px;
+}
+
 .gameover-btns {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
   justify-content: center;
   width: 100%;
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition:
+    opacity 0.25s ease,
+    transform 0.25s ease;
+}
+
+.gameover-btns.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 .gameover-btns .btn-fun {
   width: auto;
@@ -1907,6 +2002,52 @@ input {
 .timer-select {
   cursor: pointer;
   padding: 10px 14px;
+}
+
+.room-settings-panel {
+  width: 100%;
+  background: rgba(0, 229, 255, 0.07);
+  border: 2px solid rgba(0, 229, 255, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.25);
+}
+
+.room-settings-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--cyan);
+  font-family: var(--font-display);
+  font-size: 0.86rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.room-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.setting-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.setting-field .field-label {
+  font-size: 0.75rem;
+}
+
+@media (max-width: 430px) {
+  .room-settings-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ─── Letter Ask / Count Prompt Modal ────────────────────────────────── */

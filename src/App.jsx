@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { io } from "socket.io-client";
 import SlotMachine from "./SlotMachine.jsx";
 import {
@@ -29,8 +29,8 @@ import {
   IconHourglass,
 } from "./icons/Icons.jsx";
 
-const SERVER_URL = "word-duel-server-production.up.railway.app";
-// const SERVER_URL = "localhost:3001";
+// const SERVER_URL = "word-duel-server-production.up.railway.app";
+const SERVER_URL = "localhost:3001";
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 const AVATAR_COLORS = [
@@ -328,9 +328,9 @@ function LobbyScreen({ onCreated, onJoined }) {
 
   useEffect(() => {
     const sock = getSocket();
-    sock.on("room-created", ({ code, turnDuration, creatorId }) => {
+    sock.on("room-created", ({ code, turnDuration, roundLimit, creatorId, players, mode }) => {
       setLoading(false);
-      onCreated(code, username.trim(), turnDuration, creatorId);
+      onCreated(code, username.trim(), turnDuration, creatorId, players, roundLimit, mode);
     });
     sock.on("join-error", ({ message }) => {
       setLoading(false);
@@ -350,6 +350,18 @@ function LobbyScreen({ onCreated, onJoined }) {
     setError("");
     setLoading(true);
     getSocket().emit("create-room", {
+      username: username.trim(),
+    });
+  };
+
+  const handleCreateBotRoom = () => {
+    if (!username.trim()) {
+      setError("Enter your name first!");
+      return;
+    }
+    setError("");
+    setLoading(true);
+    getSocket().emit("create-bot-room", {
       username: username.trim(),
     });
   };
@@ -474,16 +486,28 @@ function LobbyScreen({ onCreated, onJoined }) {
           )}
 
           {tab === "create" ? (
-            <button
-              className="btn-fun btn-fun-yellow"
-              onClick={handleCreate}
-              disabled={loading}
-            >
-              <div className="btn-icon-row">
-                <IconDice size={20} color="currentColor" />
-                {loading ? "Creating..." : "Create Room!"}
-              </div>
-            </button>
+            <div className="create-actions">
+              <button
+                className="btn-fun btn-fun-yellow"
+                onClick={handleCreate}
+                disabled={loading}
+              >
+                <div className="btn-icon-row">
+                  <IconDice size={20} color="currentColor" />
+                  {loading ? "Creating..." : "Create Room!"}
+                </div>
+              </button>
+              <button
+                className="btn-fun btn-fun-cyan"
+                onClick={handleCreateBotRoom}
+                disabled={loading}
+              >
+                <div className="btn-icon-row">
+                  <IconTarget size={20} color="currentColor" />
+                  Practice vs Bot
+                </div>
+              </button>
+            </div>
           ) : (
             <button
               className="btn-fun btn-fun-cyan"
@@ -538,8 +562,10 @@ function WaitingScreen({
   onChat,
   onGameStart,
   turnDuration,
+  roundLimit,
   isCreator,
   onTurnDurationChange,
+  onRoundLimitChange,
 }) {
   const [countdown, setCountdown] = useState(null);
   const [showSlotMachine, setShowSlotMachine] = useState(false);
@@ -576,6 +602,10 @@ function WaitingScreen({
 
   const handleTimerChange = (event) => {
     onTurnDurationChange(Number(event.target.value));
+  };
+
+  const handleRoundLimitChange = (event) => {
+    onRoundLimitChange(Number(event.target.value));
   };
 
   const handleSlotMachineDone = useCallback(() => {
@@ -670,21 +700,38 @@ function WaitingScreen({
         </div>
 
         {isCreator && (
-          <div className="timer-setting-panel">
-            <div className="field-label">
+          <div className="room-settings-panel">
+            <div className="room-settings-title">
               <IconLightning size={14} color="var(--cyan)" />
-              Turn Timer
+              Room Settings
             </div>
-            <select
-              className="fun-input timer-select"
-              value={turnDuration}
-              onChange={handleTimerChange}
-            >
-              <option value={0}>No Timer</option>
-              <option value={30}>30 seconds</option>
-              <option value={45}>45 seconds</option>
-              <option value={60}>1 minute</option>
-            </select>
+            <div className="room-settings-grid">
+              <label className="setting-field">
+                <span className="field-label">Turn Timer</span>
+                <select
+                  className="fun-input timer-select"
+                  value={turnDuration}
+                  onChange={handleTimerChange}
+                >
+                  <option value={0}>No Timer</option>
+                  <option value={30}>30 seconds</option>
+                  <option value={45}>45 seconds</option>
+                  <option value={60}>1 minute</option>
+                </select>
+              </label>
+              <label className="setting-field">
+                <span className="field-label">Rounds</span>
+                <select
+                  className="fun-input timer-select"
+                  value={roundLimit}
+                  onChange={handleRoundLimitChange}
+                >
+                  <option value={1}>1 round</option>
+                  <option value={3}>Best of 3</option>
+                  <option value={5}>Best of 5</option>
+                </select>
+              </label>
+            </div>
           </div>
         )}
 
@@ -717,6 +764,12 @@ function WaitingScreen({
                         <span className="you-tag">
                           <IconReturnArrow size={11} color="currentColor" />
                           that's you!
+                        </span>
+                      )}
+                      {p.isBot && (
+                        <span className="you-tag">
+                          <IconTarget size={11} color="currentColor" />
+                          bot
                         </span>
                       )}
                       <span className="wins-chip">
@@ -1583,9 +1636,77 @@ function GameScreen({
 }
 
 // ─── Game Over ────────────────────────────────────────────────────────────────
+function AnimatedRevealWord({ label, word, variant, delay = 0 }) {
+  const letters = useMemo(() => String(word || "").toUpperCase().split(""), [word]);
+  const revealableCount = letters.filter((letter) => letter.trim()).length;
+  const [visibleCount, setVisibleCount] = useState(0);
+
+  useEffect(() => {
+    const timeouts = [];
+    setVisibleCount(0);
+
+    let revealIndex = 0;
+    letters.forEach((letter, index) => {
+      if (!letter.trim()) return;
+      revealIndex++;
+      const count = revealIndex;
+      const timeout = setTimeout(() => {
+        setVisibleCount(count);
+        playTone(560 + index * 34, "triangle", 0.055, 0.16);
+      }, delay + count * 105);
+      timeouts.push(timeout);
+    });
+
+    const doneTimeout = setTimeout(() => {
+      if (revealableCount > 0) SFX.ding();
+    }, delay + revealableCount * 105 + 120);
+    timeouts.push(doneTimeout);
+
+    return () => timeouts.forEach((timeout) => clearTimeout(timeout));
+  }, [delay, letters, revealableCount]);
+
+  let revealIndex = 0;
+
+  return (
+    <div className={`reveal-box animated-reveal-box ${variant}`}>
+      <div className="reveal-label">{label}</div>
+      <div className="reveal-tile-row" aria-label={`${label}: ${word}`}>
+        {letters.map((letter, index) => {
+          if (!letter.trim()) {
+            return <span key={`${letter}-${index}`} className="reveal-space" />;
+          }
+
+          revealIndex++;
+          const isVisible = revealIndex <= visibleCount;
+
+          return (
+            <span
+              key={`${letter}-${index}`}
+              className={`reveal-letter-tile ${isVisible ? "is-visible" : ""}`}
+              style={{ transitionDelay: `${Math.min(index * 22, 180)}ms` }}
+            >
+              <span>{isVisible ? letter : "?"}</span>
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function GameOverScreen({ result, myId, onRematch, chatMessages, onChat }) {
   const isWinner = result.winnerId === myId;
   const resultPlayers = Array.isArray(result.players) ? result.players : [];
+  const opponent = resultPlayers.find((player) => player.id !== myId);
+  const myResultWord =
+    result.wordsByPlayer?.[myId] || result.loserWord || result.correctWord || "";
+  const opponentResultWord =
+    result.wordsByPlayer?.[opponent?.id] || result.correctWord || result.loserWord || "";
+  const longestReveal = Math.max(
+    String(myResultWord).replace(/\s/g, "").length,
+    String(opponentResultWord).replace(/\s/g, "").length,
+  );
+  const [revealDone, setRevealDone] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const prevMsgCount = useRef(chatMessages.length);
@@ -1602,6 +1723,20 @@ function GameOverScreen({ result, myId, onRematch, chatMessages, onChat }) {
     setChatOpen((o) => !o);
     setUnread(0);
   };
+
+  useEffect(() => {
+    setRevealDone(false);
+    const timeout = setTimeout(() => setRevealDone(true), longestReveal * 105 + 900);
+    return () => clearTimeout(timeout);
+  }, [longestReveal, result.winnerId]);
+
+  const rematchLabel = result.seriesOver
+    ? result.roundLimit > 1
+      ? "Rematch Series!"
+      : "Rematch!"
+    : result.roundLimit > 1
+      ? "Next Round!"
+      : "Rematch!";
 
   return (
     <div
@@ -1632,12 +1767,22 @@ function GameOverScreen({ result, myId, onRematch, chatMessages, onChat }) {
             color: "var(--muted)",
             fontSize: "1rem",
             letterSpacing: "1px",
+            textAlign: "center",
           }}
         >
           {isWinner
             ? "You cracked the code!"
             : `${result.winnerName} got it first!`}
         </div>
+
+        {result.roundLimit > 1 && (
+          <div className="series-pill">
+            Round {result.roundNumber || 1} of {result.roundLimit}
+            {result.seriesOver
+              ? ` - ${result.seriesWinnerName} wins the series`
+              : ` - first to ${result.winsToSeries}`}
+          </div>
+        )}
 
         {resultPlayers.length > 0 && (
           <div className="gameover-scoreboard">
@@ -1660,30 +1805,34 @@ function GameOverScreen({ result, myId, onRematch, chatMessages, onChat }) {
         )}
 
         <div className="reveal-words">
-          <div className="reveal-box">
-            <div className="reveal-label">Opponent's Word</div>
-            <div className="reveal-word opp-word">
-              {result.correctWord?.toUpperCase()}
-            </div>
-          </div>
-          <div className="reveal-box">
-            <div className="reveal-label">Your Word</div>
-            <div className="reveal-word my-word">
-              {result.loserWord?.toUpperCase()}
-            </div>
-          </div>
+          <AnimatedRevealWord
+            label="Opponent's Word"
+            word={opponentResultWord}
+            variant="opp-word"
+          />
+          <AnimatedRevealWord
+            label="Your Word"
+            word={myResultWord}
+            variant="my-word"
+            delay={180}
+          />
         </div>
 
-        <div className="gameover-btns">
-          <button className="btn-fun btn-fun-yellow" onClick={onRematch}>
+        <div className={`gameover-btns ${revealDone ? "is-visible" : ""}`}>
+          <button
+            className="btn-fun btn-fun-yellow"
+            onClick={onRematch}
+            disabled={!revealDone}
+          >
             <div className="btn-icon-row">
               <IconDice size={20} color="currentColor" />
-              Rematch!
+              {rematchLabel}
             </div>
           </button>
           <button
             className="btn-fun btn-fun-ghost"
             onClick={() => window.location.reload()}
+            disabled={!revealDone}
           >
             <div className="btn-icon-row">
               <IconX size={18} color="currentColor" />
@@ -1715,6 +1864,8 @@ export default function App() {
   const [gameLogs, setGameLogs] = useState([]);
   const [chatMessages, setChatMessages] = useState([]);
   const [turnDuration, setTurnDuration] = useState(0);
+  const [roundLimit, setRoundLimit] = useState(1);
+  const [roomMode, setRoomMode] = useState("duel");
   const [creatorId, setCreatorId] = useState(null);
 
   const myId = getSocket().id;
@@ -1743,11 +1894,15 @@ export default function App() {
     const handlePlayerJoined = ({
       players: pl,
       turnDuration: td,
+      roundLimit: rl,
       creatorId: cid,
+      mode,
     }) => {
       setPlayers(pl);
       if (td !== undefined) setTurnDuration(td);
+      if (rl !== undefined) setRoundLimit(rl);
       if (cid !== undefined) setCreatorId(cid);
+      if (mode) setRoomMode(mode);
     };
     const handleReadyUpdate = ({ players: pl, creatorId: cid }) => {
       setPlayers(pl);
@@ -1757,12 +1912,17 @@ export default function App() {
       setTurnDuration(td || 0);
       if (cid !== undefined) setCreatorId(cid);
     };
+    const handleRoundLimitUpdate = ({ roundLimit: rl, creatorId: cid }) => {
+      setRoundLimit(rl || 1);
+      if (cid !== undefined) setCreatorId(cid);
+    };
     const handleChatHistory = ({ messages }) => setChatMessages(messages);
     const handleChatMessage = (msg) =>
       setChatMessages((prev) => [...prev, msg]);
     const handleGameStartEvent = (data) => {
       setGameState((prev) => ({ ...data, code: roomCode || prev?.code }));
       if (data.turnDuration !== undefined) setTurnDuration(data.turnDuration);
+      if (data.roundLimit !== undefined) setRoundLimit(data.roundLimit);
       setGameLogs([]);
       setScreen("game");
       addSystemChat("Game started! Good luck!");
@@ -1770,10 +1930,12 @@ export default function App() {
     const handleRematchLobby = ({
       players: pl,
       turnDuration: td,
+      roundLimit: rl,
       creatorId: cid,
     }) => {
       setPlayers(pl);
       if (td !== undefined) setTurnDuration(td);
+      if (rl !== undefined) setRoundLimit(rl);
       if (cid !== undefined) setCreatorId(cid);
       setGameState(null);
       setGameOverResult(null);
@@ -1789,6 +1951,7 @@ export default function App() {
     sock.on("player-joined", handlePlayerJoined);
     sock.on("ready-update", handleReadyUpdate);
     sock.on("turn-duration-update", handleTurnDurationUpdate);
+    sock.on("round-limit-update", handleRoundLimitUpdate);
     sock.on("chat-history", handleChatHistory);
     sock.on("chat-message", handleChatMessage);
     sock.on("game-start", handleGameStartEvent);
@@ -1799,6 +1962,7 @@ export default function App() {
       sock.off("player-joined", handlePlayerJoined);
       sock.off("ready-update", handleReadyUpdate);
       sock.off("turn-duration-update", handleTurnDurationUpdate);
+      sock.off("round-limit-update", handleRoundLimitUpdate);
       sock.off("chat-history", handleChatHistory);
       sock.off("chat-message", handleChatMessage);
       sock.off("game-start", handleGameStartEvent);
@@ -1812,17 +1976,20 @@ export default function App() {
       setGameState((prev) => ({ ...prev, code: roomCode }));
   }, [roomCode, gameState]);
 
-  const handleRoomCreated = (code, username, td, cid) => {
+  const handleRoomCreated = (code, username, td, cid, pl, rl, mode) => {
     setRoomCode(code);
     setTurnDuration(td || 0);
+    setRoundLimit(rl || 1);
+    setRoomMode(mode || "duel");
     setCreatorId(cid || getSocket().id);
-    setPlayers([{ id: getSocket().id, username, ready: false, wins: 0 }]);
+    setPlayers(pl || [{ id: getSocket().id, username, ready: false, wins: 0 }]);
     setGameLogs([]);
     setScreen("waiting");
   };
 
   const handleRoomJoined = (code) => {
     setRoomCode(code);
+    setRoomMode("duel");
     setGameLogs([]);
     setScreen("waiting");
   };
@@ -1857,10 +2024,22 @@ export default function App() {
     [roomCode],
   );
 
+  const handleRoundLimitChange = useCallback(
+    (limit) => {
+      setRoundLimit(limit);
+      getSocket().emit("set-round-limit", {
+        code: roomCode,
+        roundLimit: limit,
+      });
+    },
+    [roomCode],
+  );
+
   const handleGameStart = useCallback(
     (data) => {
       setGameState((prev) => ({ ...data, code: roomCode || prev?.code }));
       if (data.turnDuration !== undefined) setTurnDuration(data.turnDuration);
+      if (data.roundLimit !== undefined) setRoundLimit(data.roundLimit);
       setGameLogs([]);
       setScreen("game");
     },
@@ -1882,14 +2061,16 @@ export default function App() {
         onChat={handleChat}
         onGameStart={handleGameStart}
         turnDuration={turnDuration}
+        roundLimit={roundLimit}
         isCreator={creatorId === myId}
         onTurnDurationChange={handleTurnDurationChange}
+        onRoundLimitChange={handleRoundLimitChange}
       />
     );
   if (screen === "game" && gameState)
     return (
       <GameScreen
-        gameState={{ ...gameState, code: roomCode, turnDuration }}
+        gameState={{ ...gameState, code: roomCode, turnDuration, roundLimit }}
         myId={myId}
         gameLogs={gameLogs}
         setGameLogs={setGameLogs}

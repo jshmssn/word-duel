@@ -29,8 +29,8 @@ import {
   IconHourglass,
 } from "./icons/Icons.jsx";
 
-const SERVER_URL = "word-duel-server-production.up.railway.app";
-// const SERVER_URL = "localhost:3001";
+// const SERVER_URL = "word-duel-server-production.up.railway.app";
+const SERVER_URL = "localhost:3001";
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 const AVATAR_COLORS = [
@@ -263,6 +263,70 @@ function FloatingChat({ messages, onSend, myId, isOpen, onToggle, unread }) {
 }
 
 // ─── Turn Timer ───────────────────────────────────────────────────────────────
+function LeaveMatchModal({ screen, onStay, onLeave }) {
+  const isWaiting = screen === "waiting";
+  const isGameOver = screen === "gameover";
+  const title = isWaiting ? "Leave room?" : "Leave match?";
+  const body = isWaiting
+    ? "You are still connected to this room. Leaving will reset your room and notify the other player."
+    : isGameOver
+      ? "Leaving will close this room and return you to the lobby."
+      : "This match is still active. Leaving will reset your connection and notify the other player.";
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") onStay();
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onStay]);
+
+  return (
+    <div
+      className="prompt-overlay leave-match-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="leave-match-dialog-title"
+      onClick={onStay}
+    >
+      <div
+        className="prompt-modal prompt-decision-modal leave-match-modal"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="leave-match-icon">
+          <IconWarning size={34} color="currentColor" />
+        </div>
+        <div
+          className="prompt-title prompt-title-row leave-match-title"
+          id="leave-match-dialog-title"
+        >
+          {title}
+        </div>
+        <div className="leave-match-copy">{body}</div>
+        <div className="prompt-buttons leave-match-actions">
+          <button
+            className="btn-fun btn-fun-green"
+            onClick={onStay}
+            autoFocus
+          >
+            <span className="btn-icon-row">
+              <IconShield size={18} color="currentColor" />
+              Stay
+            </span>
+          </button>
+          <button className="btn-fun btn-fun-red" onClick={onLeave}>
+            <span className="btn-icon-row">
+              <IconX size={18} color="currentColor" />
+              Leave
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TurnTimer({ remaining, total, isMyTurn }) {
   if (!total) return null;
   const pct = Math.max(0, (remaining / total) * 100);
@@ -1867,8 +1931,11 @@ export default function App() {
   const [roundLimit, setRoundLimit] = useState(1);
   const [roomMode, setRoomMode] = useState("duel");
   const [creatorId, setCreatorId] = useState(null);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const allowLeaveRef = useRef(false);
 
   const myId = getSocket().id;
+  const shouldProtectLeave = screen !== "lobby" && Boolean(roomCode);
 
   const addSystemChat = useCallback((text) => {
     setChatMessages((prev) => [
@@ -1888,6 +1955,57 @@ export default function App() {
     },
     [roomCode],
   );
+
+  const handleStayInMatch = useCallback(() => {
+    setShowLeaveConfirm(false);
+  }, []);
+
+  const handleLeaveConfirmed = useCallback(() => {
+    allowLeaveRef.current = true;
+    setShowLeaveConfirm(false);
+    window.location.reload();
+  }, []);
+
+  useEffect(() => {
+    if (!shouldProtectLeave) {
+      setShowLeaveConfirm(false);
+      allowLeaveRef.current = false;
+      return;
+    }
+
+    allowLeaveRef.current = false;
+    const guardState = {
+      ...(window.history.state || {}),
+      wordDuelLeaveGuard: true,
+    };
+    const ensureGuardState = () => {
+      if (!window.history.state?.wordDuelLeaveGuard) {
+        window.history.pushState(guardState, "", window.location.href);
+      }
+    };
+    const handlePopState = () => {
+      if (allowLeaveRef.current) return;
+      setShowLeaveConfirm(true);
+      ensureGuardState();
+    };
+
+    ensureGuardState();
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [shouldProtectLeave]);
+
+  useEffect(() => {
+    if (!shouldProtectLeave) return;
+
+    const handleBeforeUnload = (event) => {
+      if (allowLeaveRef.current) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [shouldProtectLeave]);
 
   useEffect(() => {
     const sock = getSocket();
@@ -2046,12 +2164,14 @@ export default function App() {
     [roomCode],
   );
 
-  if (screen === "lobby")
-    return (
+  let screenContent = null;
+
+  if (screen === "lobby") {
+    screenContent = (
       <LobbyScreen onCreated={handleRoomCreated} onJoined={handleRoomJoined} />
     );
-  if (screen === "waiting")
-    return (
+  } else if (screen === "waiting") {
+    screenContent = (
       <WaitingScreen
         code={roomCode}
         players={players}
@@ -2067,8 +2187,8 @@ export default function App() {
         onRoundLimitChange={handleRoundLimitChange}
       />
     );
-  if (screen === "game" && gameState)
-    return (
+  } else if (screen === "game" && gameState) {
+    screenContent = (
       <GameScreen
         gameState={{ ...gameState, code: roomCode, turnDuration, roundLimit }}
         myId={myId}
@@ -2080,8 +2200,8 @@ export default function App() {
         onChat={handleChat}
       />
     );
-  if (screen === "gameover" && gameOverResult)
-    return (
+  } else if (screen === "gameover" && gameOverResult) {
+    screenContent = (
       <GameOverScreen
         result={gameOverResult}
         myId={myId}
@@ -2090,5 +2210,18 @@ export default function App() {
         onChat={handleChat}
       />
     );
-  return null;
+  }
+
+  return (
+    <>
+      {screenContent}
+      {showLeaveConfirm && (
+        <LeaveMatchModal
+          screen={screen}
+          onStay={handleStayInMatch}
+          onLeave={handleLeaveConfirmed}
+        />
+      )}
+    </>
+  );
 }

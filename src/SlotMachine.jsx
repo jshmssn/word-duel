@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
+
+// ─── Data ───────────────────────────────────────────────────────────────────
 
 const CATEGORIES = [
   { name: "Traditional Games", emoji: "🎲" },
@@ -33,761 +35,355 @@ const CATEGORIES = [
   { name: "Plants", emoji: "🌱" },
 ];
 
-const ACCENTS = [
-  "#c77dff",
-  "#00e5ff",
-  "#ff4da6",
-  "#ffe135",
-  "#69ff47",
-  "#ff7043",
-  "#40a9ff",
-  "#bcff4f",
+// Vivid segment colors – cycles through the wheel
+const SEGMENT_COLORS = [
+  "#7c3aed", // violet
+  "#0e9488", // teal
+  "#d97706", // amber
+  "#db2777", // pink
+  "#2563eb", // blue
+  "#dc2626", // red
+  "#059669", // green
+  "#9333ea", // purple
+  "#ea580c", // orange
+  "#0284c7", // sky
+  "#65a30d", // lime
+  "#c026d3", // fuchsia
 ];
 
-const SHUFFLE_EMOJIS = ["🎲", "❓", "⚡", "🌟", "🎯", "🌀", "✨", "🔮"];
+const SLICE = (2 * Math.PI) / CATEGORIES.length;
+const SPIN_DURATION = 4200; // ms
 
-const REEL_HEIGHT = 286;
-const ROW_HEIGHT = 58;
-const FINAL_CYCLE = 5;
-const SPIN_DURATION = 2800;
-const INTRO_DURATION = 760;
-const INTRO_ACCENT = "#c77dff";
-
-function normalizeName(name) {
-  return String(name || "").trim().toLowerCase();
-}
+// ─── Audio helpers ───────────────────────────────────────────────────────────
 
 function getAudioBridge() {
   if (typeof window === "undefined") return {};
   return window.wordDuelAudio || {};
 }
 
-function playSlotTone(freq, type, duration, vol, startTime = null) {
-  const fallbackTone = typeof window !== "undefined" ? window.playTone : null;
-  const tone = getAudioBridge().playTone || fallbackTone;
-
+function playTone(freq, type, duration, vol, startTime = null) {
+  const bridge = getAudioBridge();
+  const tone = bridge.playTone || (typeof window !== "undefined" ? window.playTone : null);
   if (typeof tone !== "function") return;
-
-  try {
-    tone(freq, type, duration, vol, startTime);
-  } catch {
-    // Audio should never break the game.
-  }
+  try { tone(freq, type, duration, vol, startTime); } catch { /* silent */ }
 }
 
-function getSlotAudioCtx() {
-  const fallbackGetCtx =
-    typeof window !== "undefined" ? window.getAudioCtx : null;
-
-  const getCtx = getAudioBridge().getAudioCtx || fallbackGetCtx;
-
+function getAudioCtx() {
+  const bridge = getAudioBridge();
+  const getCtx = bridge.getAudioCtx || (typeof window !== "undefined" ? window.getAudioCtx : null);
   if (typeof getCtx !== "function") return null;
-
-  try {
-    return getCtx();
-  } catch {
-    return null;
-  }
+  try { return getCtx(); } catch { return null; }
 }
 
-function playFightFanfare() {
-  const fallbackSfx = typeof window !== "undefined" ? window.SFX : null;
-  const sfx = getAudioBridge().SFX || fallbackSfx;
-
-  try {
-    if (typeof sfx?.yourTurn === "function") sfx.yourTurn();
-  } catch {
-    // Ignore unavailable audio.
-  }
+function playFanfare() {
+  const bridge = getAudioBridge();
+  const sfx = bridge.SFX || (typeof window !== "undefined" ? window.SFX : null);
+  try { if (typeof sfx?.yourTurn === "function") sfx.yourTurn(); } catch { /* silent */ }
 }
 
+// ─── Canvas draw ─────────────────────────────────────────────────────────────
+
+function drawWheel(canvas, angle, highlightIndex = -1) {
+  const W = canvas.width;
+  const CX = W / 2;
+  const CY = W / 2;
+  const R = CX - 6;
+  const ctx = canvas.getContext("2d");
+
+  ctx.clearRect(0, 0, W, W);
+
+  CATEGORIES.forEach((cat, i) => {
+    const start = angle + i * SLICE - Math.PI / 2;
+    const end = start + SLICE;
+    const mid = start + SLICE / 2;
+    const color = SEGMENT_COLORS[i % SEGMENT_COLORS.length];
+    const isHighlight = i === highlightIndex;
+
+    // Segment fill
+    ctx.beginPath();
+    ctx.moveTo(CX, CY);
+    ctx.arc(CX, CY, isHighlight ? R + 4 : R, start, end);
+    ctx.closePath();
+    ctx.fillStyle = isHighlight ? color : color + "dd";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.55)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Label – always reads left-to-right (flip text on left half of wheel)
+    ctx.save();
+    ctx.translate(CX, CY);
+
+    // mid is the angle of the segment midpoint in canvas coords.
+    // Normalise to [0, 2π) so we can tell left vs right half.
+    const midNorm = ((mid % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+    const onLeftHalf = midNorm > Math.PI / 2 && midNorm < (3 * Math.PI) / 2;
+
+    if (onLeftHalf) {
+      // Rotate to the midpoint then flip 180° so text reads outward correctly
+      ctx.rotate(mid + Math.PI);
+      ctx.textAlign = "left";
+    } else {
+      ctx.rotate(mid);
+      ctx.textAlign = "right";
+    }
+
+    ctx.fillStyle = "#fff";
+    const fSize = W < 300 ? 9 : 11;
+    ctx.font = `600 ${fSize}px -apple-system, sans-serif`;
+    ctx.shadowColor = "rgba(0,0,0,0.7)";
+    ctx.shadowBlur = 3;
+
+    const maxChars = W < 300 ? 8 : 11;
+    const label =
+      cat.name.length > maxChars
+        ? cat.name.slice(0, maxChars) + "…"
+        : cat.name;
+
+    const textX = onLeftHalf ? -(R - 8) : R - 8;
+    // Draw emoji first (slightly larger), then name
+    const emojiSize = fSize + 2;
+    ctx.font = `${emojiSize}px -apple-system, sans-serif`;
+    const emojiW = ctx.measureText(cat.emoji + " ").width;
+    if (onLeftHalf) {
+      ctx.fillText(cat.emoji + " ", textX, 4);
+      ctx.font = `600 ${fSize}px -apple-system, sans-serif`;
+      ctx.fillText(label, textX + emojiW, 4);
+    } else {
+      ctx.font = `600 ${fSize}px -apple-system, sans-serif`;
+      const nameW = ctx.measureText(label).width;
+      ctx.font = `${emojiSize}px -apple-system, sans-serif`;
+      ctx.fillText(cat.emoji, textX - nameW - emojiW + ctx.measureText(cat.emoji).width, 4);
+      ctx.font = `600 ${fSize}px -apple-system, sans-serif`;
+      ctx.fillText(label, textX, 4);
+    }
+
+    ctx.restore();
+  });
+
+  // Center hub
+  const hubR = W < 300 ? 14 : 18;
+  ctx.beginPath();
+  ctx.arc(CX, CY, hubR, 0, 2 * Math.PI);
+  ctx.fillStyle = "#1e0838";
+  ctx.fill();
+  ctx.strokeStyle = "rgba(199,125,255,0.7)";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(CX, CY, hubR * 0.5, 0, 2 * Math.PI);
+  ctx.fillStyle = "#c77dff";
+  ctx.fill();
+}
+
+// drawWheel draws segment i starting at: angle + i*SLICE - PI/2
+// The pointer sits at -PI/2 (top). A segment i is under the pointer when:
+//   angle + i*SLICE - PI/2 <= -PI/2 < angle + (i+1)*SLICE - PI/2
+//   => 0 <= angle + i*SLICE < SLICE  => i = floor(-angle / SLICE)
+function getTopIndex(angle) {
+  const norm = ((-angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  return Math.floor(norm / SLICE) % CATEGORIES.length;
+}
+
+// The resting angle whose midpoint lands exactly under the pointer.
+// Segment midpoint = angle + index*SLICE - PI/2 + SLICE/2 = -PI/2
+// => angle = -(index*SLICE + SLICE/2)
+function angleForIndex(index) {
+  return -(index * SLICE + SLICE / 2);
+}
+
+// ─── Easing ──────────────────────────────────────────────────────────────────
+
+function easeOutQuart(t) {
+  return 1 - Math.pow(1 - t, 4);
+}
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
+/**
+ * SpinWheel – drop-in replacement for SlotMachine.
+ *
+ * Props:
+ *   selectedCategoryName  string  – the category the server picked
+ *   onDone                fn      – called after countdown finishes
+ */
 export default function SlotMachine({ selectedCategoryName, onDone }) {
-  const [phase, setPhase] = useState("intro");
-  const [spinTranslate, setSpinTranslate] = useState(0);
-  const [landed, setLanded] = useState(false);
-  const [resultVisible, setResultVisible] = useState(false);
-  const [countdown, setCountdown] = useState(null);
-  const [shuffleEmoji, setShuffleEmoji] = useState("❓");
-
+  const canvasRef = useRef(null);
+  const angleRef = useRef(0);
+  const rafRef = useRef(null);
   const onDoneRef = useRef(onDone);
-  const doneCalledRef = useRef(false);
 
+  const [phase, setPhase] = useState("idle"); // idle | spinning | landed | result
+  const [countdown, setCountdown] = useState(null);
+  const [winnerIndex, setWinnerIndex] = useState(-1);
+
+  useEffect(() => { onDoneRef.current = onDone; }, [onDone]);
+
+  // Resize canvas to its displayed size (mobile-safe)
   useEffect(() => {
-    onDoneRef.current = onDone;
-  }, [onDone]);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const resize = () => {
+      const size = Math.min(canvas.offsetWidth, 340);
+      canvas.width = size;
+      canvas.height = size;
+      drawWheel(canvas, angleRef.current, winnerIndex);
+    };
+    resize();
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  }, [winnerIndex]);
 
-  const selectedIndex = Math.max(
-    0,
-    CATEGORIES.findIndex(
-      (category) =>
-        normalizeName(category.name) === normalizeName(selectedCategoryName)
-    )
-  );
+  // Main animation sequence
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
 
-  const selectedCategory = CATEGORIES[selectedIndex] || CATEGORIES[0];
-  const accent = ACCENTS[selectedIndex % ACCENTS.length];
-  const activeAccent = phase === "intro" ? INTRO_ACCENT : accent;
-
-  const centerOffset = REEL_HEIGHT / 2 - ROW_HEIGHT / 2;
-  const finalIndex = FINAL_CYCLE * CATEGORIES.length + selectedIndex;
-
-  const startTranslate =
-    centerOffset - (CATEGORIES.length + selectedIndex) * ROW_HEIGHT;
-
-  const targetTranslate = centerOffset - finalIndex * ROW_HEIGHT;
-
-  const reelItems = useMemo(() => {
-    return Array.from({ length: FINAL_CYCLE + 2 }).flatMap((_, cycle) =>
-      CATEGORIES.map((category, categoryIndex) => ({
-        ...category,
-        accent: ACCENTS[categoryIndex % ACCENTS.length],
-        categoryIndex,
-        reelIndex: cycle * CATEGORIES.length + categoryIndex,
-      }))
+    const targetIndex = Math.max(
+      0,
+      CATEGORIES.findIndex(
+        (c) => c.name.trim().toLowerCase() === (selectedCategoryName || "").trim().toLowerCase()
+      )
     );
-  }, []);
 
-  useEffect(() => {
-    const timeouts = [];
-    const intervals = [];
-    let cancelled = false;
+    // Compute final resting angle so targetIndex midpoint is under the pointer
+    const restAngle = angleForIndex(targetIndex);
+    // Normalise to [-2PI, 0]
+    const restNorm = ((restAngle % (2 * Math.PI)) - 2 * Math.PI);
+    // Spin at least 8 full rotations forward (wheel rotates clockwise = angle decreases)
+    const fullRotations = 8 + Math.floor(Math.random() * 4);
+    const totalDelta = fullRotations * 2 * Math.PI + Math.abs(restNorm);
 
-    const schedule = (callback, delay) => {
-      const id = window.setTimeout(() => {
-        if (!cancelled) callback();
-      }, delay);
-
-      timeouts.push(id);
-      return id;
-    };
-
-    const clearAllIntervals = () => {
-      intervals.forEach((id) => window.clearInterval(id));
-    };
-
-    const playLand = () => {
-      const ctx = getSlotAudioCtx();
-      const now = ctx?.currentTime ?? null;
-
-      playSlotTone(180, "sawtooth", 0.14, 0.45, now);
-      playSlotTone(1400, "sine", 0.18, 0.28, now !== null ? now + 0.08 : null);
-    };
-
-    const startCountdown = () => {
-      setPhase("result");
-      setResultVisible(true);
-
-      [
-        { count: 3, freq: 440 },
-        { count: 2, freq: 550 },
-        { count: 1, freq: 660 },
-      ].forEach((tick, index) => {
-        schedule(() => {
-          setCountdown(tick.count);
-          playSlotTone(tick.freq, "square", 0.08, 0.3);
-        }, index * 850);
-      });
-
-      schedule(() => {
-        setCountdown(0);
-        playFightFanfare();
-      }, 2550);
-
-      schedule(() => {
-        if (doneCalledRef.current) return;
-
-        doneCalledRef.current = true;
-        onDoneRef.current?.();
-      }, 3150);
-    };
-
-    doneCalledRef.current = false;
-
-    setPhase("intro");
-    setSpinTranslate(startTranslate);
-    setLanded(false);
-    setResultVisible(false);
+    const startAngle = 0;
+    angleRef.current = startAngle;
+    setPhase("spinning");
     setCountdown(null);
-    setShuffleEmoji("❓");
+    setWinnerIndex(-1);
 
-    const shuffleEmojiInterval = window.setInterval(() => {
-      const randomIndex = Math.floor(Math.random() * SHUFFLE_EMOJIS.length);
-      setShuffleEmoji(SHUFFLE_EMOJIS[randomIndex]);
-    }, 120);
+    const startTime = performance.now();
+    let lastTickIdx = -1;
+    let doneScheduled = false;
 
-    intervals.push(shuffleEmojiInterval);
+    function animate(now) {
+      const elapsed = now - startTime;
+      const t = Math.min(elapsed / SPIN_DURATION, 1);
+      const angle = startAngle - totalDelta * easeOutQuart(t);
+      angleRef.current = angle;
 
-    schedule(() => {
-      if (cancelled) return;
+      // Tick sound as segments pass
+      const currentIdx = getTopIndex(angle);
+      if (currentIdx !== lastTickIdx && t < 0.92) {
+        const speed = 1 - t; // 1 = fast start, 0 = slow end
+        if (speed > 0.05) {
+          playTone(600 + currentIdx * 30, "square", 0.03, 0.08 * speed);
+        }
+        lastTickIdx = currentIdx;
+      }
 
-      setPhase("spin");
+      drawWheel(canvas, angle, t >= 1 ? targetIndex : -1);
 
-      playSlotTone(620, "sine", 0.08, 0.18);
-      playSlotTone(820, "sine", 0.08, 0.16);
-
-      const tickInterval = window.setInterval(() => {
-        playSlotTone(920 + Math.random() * 180, "square", 0.03, 0.09);
-      }, 170);
-
-      intervals.push(tickInterval);
-
-      schedule(() => {
-        setSpinTranslate(targetTranslate);
-      }, 80);
-
-      schedule(() => {
-        clearAllIntervals();
-
-        setSpinTranslate(targetTranslate);
-        setLanded(true);
+      if (t < 1) {
+        rafRef.current = requestAnimationFrame(animate);
+      } else {
+        // Landed
+        angleRef.current = -totalDelta;
+        drawWheel(canvas, angleRef.current, targetIndex);
         setPhase("landed");
+        setWinnerIndex(targetIndex);
 
-        playLand();
+        // Land thud
+        const ctx2 = getAudioCtx();
+        const now2 = ctx2?.currentTime ?? null;
+        playTone(180, "sawtooth", 0.14, 0.45, now2);
+        playTone(1400, "sine", 0.18, 0.28, now2 !== null ? now2 + 0.08 : null);
 
-        schedule(startCountdown, 560);
-      }, SPIN_DURATION + 140);
-    }, INTRO_DURATION);
+        // Countdown 3-2-1-⚔️
+        const ticks = [
+          { count: 3, freq: 440, delay: 500 },
+          { count: 2, freq: 550, delay: 1350 },
+          { count: 1, freq: 660, delay: 2200 },
+          { count: 0, freq: 0, delay: 3050 },
+        ];
+
+        ticks.forEach(({ count, freq, delay }) => {
+          setTimeout(() => {
+            setCountdown(count);
+            if (count > 0) playTone(freq, "square", 0.08, 0.3);
+            else {
+              setPhase("result");
+              playFanfare();
+            }
+          }, delay);
+        });
+
+        setTimeout(() => {
+          if (!doneScheduled) {
+            doneScheduled = true;
+            onDoneRef.current?.();
+          }
+        }, 3700);
+      }
+    }
+
+    rafRef.current = requestAnimationFrame(animate);
 
     return () => {
-      cancelled = true;
-
-      timeouts.forEach((id) => window.clearTimeout(id));
-      clearAllIntervals();
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-  }, [selectedCategoryName, selectedIndex, startTranslate, targetTranslate]);
+  }, [selectedCategoryName]);
 
-  const overlayStyle = {
-    position: "fixed",
-    inset: 0,
-    zIndex: 9999,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 16,
-    background:
-      "radial-gradient(circle at top, rgba(90, 45, 138, 0.45), transparent 42%), rgba(26, 5, 51, 0.94)",
-    backdropFilter: "blur(6px)",
-    WebkitBackdropFilter: "blur(6px)",
-    animation: "slotOverlayFade 220ms ease-out both",
-  };
-
-  const cardStyle = {
-    position: "relative",
-    width: "min(620px, calc(100vw - 24px))",
-    maxHeight: "calc(100vh - 24px)",
-    overflow: "hidden",
-    padding: "20px 16px 16px",
-    background: "linear-gradient(175deg, #2a0d4a, #1e0838, #170630)",
-    border: "1.5px solid #5a2d8a",
-    borderRadius: 26,
-    boxShadow:
-      "0 26px 78px rgba(0, 0, 0, 0.58), inset 0 1px 0 rgba(255, 255, 255, 0.08)",
-  };
-
-  const shimmerStripStyle = (edge) => ({
-    position: "absolute",
-    left: 18,
-    right: 18,
-    [edge]: 10,
-    height: 5,
-    borderRadius: 999,
-    background:
-      "linear-gradient(90deg, #c77dff, #00e5ff, #ff4da6, #ffe135, #69ff47, #ff7043, #c77dff)",
-    backgroundSize: "300% 100%",
-    animation: "slotRainbowSlide 2.2s linear infinite",
-    opacity: 0.78,
-    boxShadow: "0 0 18px rgba(199, 125, 255, 0.34)",
-  });
-
-  const headerStyle = {
-    width: "fit-content",
-    maxWidth: "100%",
-    margin: "0 auto 14px",
-    padding: "8px 18px",
-    borderRadius: 999,
-    border: "1px solid rgba(199, 125, 255, 0.42)",
-    background: "rgba(199, 125, 255, 0.1)",
-    color: "#f0e8ff",
-    fontFamily: "var(--font-display)",
-    fontSize: "clamp(1rem, 4vw, 1.3rem)",
-    letterSpacing: "1px",
-    textAlign: "center",
-    textShadow: "0 2px 0 rgba(0, 0, 0, 0.4)",
-  };
-
-  const reelStyle = {
-    position: "relative",
-    height: REEL_HEIGHT,
-    overflow: "hidden",
-    borderRadius: 22,
-    border: "1px solid rgba(90, 45, 138, 0.95)",
-    background:
-      "radial-gradient(circle at center, rgba(199, 125, 255, 0.16), transparent 48%), #120425",
-    boxShadow:
-      "inset 0 0 34px rgba(0, 0, 0, 0.62), 0 16px 38px rgba(0, 0, 0, 0.28)",
-  };
-
-  const centerBarStyle = {
-    position: "absolute",
-    left: 12,
-    right: 12,
-    top: "50%",
-    height: 74,
-    transform: "translateY(-50%)",
-    borderRadius: 20,
-    border: `1px solid ${landed ? accent : "rgba(199, 125, 255, 0.36)"}`,
-    background: landed
-      ? `linear-gradient(90deg, ${accent}28, rgba(255,255,255,0.1), ${accent}20)`
-      : "linear-gradient(90deg, rgba(199,125,255,0.08), rgba(255,255,255,0.08), rgba(199,125,255,0.08))",
-    boxShadow: landed
-      ? `0 0 30px ${accent}88, inset 0 0 24px ${accent}28`
-      : "inset 0 0 18px rgba(199, 125, 255, 0.12)",
-    transition: "all 380ms ease",
-    pointerEvents: "none",
-    zIndex: 3,
-  };
-
-  const fadeStyle = (edge) => ({
-    position: "absolute",
-    left: 0,
-    right: 0,
-    [edge]: 0,
-    height: 92,
-    background:
-      edge === "top"
-        ? "linear-gradient(180deg, #120425 0%, rgba(18, 4, 37, 0) 100%)"
-        : "linear-gradient(0deg, #120425 0%, rgba(18, 4, 37, 0) 100%)",
-    pointerEvents: "none",
-    zIndex: 4,
-  });
+  const winner = CATEGORIES[winnerIndex] ?? null;
+  const accentColor =
+    winnerIndex >= 0 ? SEGMENT_COLORS[winnerIndex % SEGMENT_COLORS.length] : "#c77dff";
 
   return (
-    <div style={overlayStyle}>
-      <style>
-        {`
-          @keyframes slotOverlayFade {
-            from {
-              opacity: 0;
-            }
+    <div style={styles.overlay}>
+      <style>{css}</style>
 
-            to {
-              opacity: 1;
-            }
-          }
+      <div style={styles.card}>
+        {/* Rainbow strips */}
+        <div style={styles.strip("top")} />
+        <div style={styles.strip("bottom")} />
 
-          @keyframes slotRainbowSlide {
-            from {
-              background-position: 0% 50%;
-            }
+        {/* Header */}
+        <div style={styles.header}>⚔️ Category Roulette ⚔️</div>
 
-            to {
-              background-position: 300% 50%;
-            }
-          }
+        {/* Wheel area */}
+        <div style={styles.wheelWrap}>
+          {/* Pointer */}
+          <div style={styles.pointer} />
 
-          @keyframes slotPulse {
-            0%, 100% {
-              opacity: 0.72;
-              transform: scale(1);
-            }
-
-            50% {
-              opacity: 1;
-              transform: scale(1.035);
-            }
-          }
-
-          @keyframes slotScanner {
-            0% {
-              transform: translateX(-120%);
-              opacity: 0;
-            }
-
-            20% {
-              opacity: 1;
-            }
-
-            100% {
-              transform: translateX(120%);
-              opacity: 0;
-            }
-          }
-
-          @keyframes slotIntroIn {
-            0% {
-              opacity: 0;
-              transform: translateY(18px) scale(0.96);
-            }
-
-            100% {
-              opacity: 1;
-              transform: translateY(0) scale(1);
-            }
-          }
-
-          @keyframes slotResultIn {
-            0% {
-              opacity: 0;
-              transform: translateY(16px) scale(0.92);
-            }
-
-            72% {
-              opacity: 1;
-              transform: translateY(-2px) scale(1.03);
-            }
-
-            100% {
-              opacity: 1;
-              transform: translateY(0) scale(1);
-            }
-          }
-
-          @keyframes slotCountPop {
-            0% {
-              opacity: 0;
-              transform: scale(0.45) rotate(-8deg);
-            }
-
-            62% {
-              opacity: 1;
-              transform: scale(1.16) rotate(2deg);
-            }
-
-            100% {
-              opacity: 1;
-              transform: scale(1) rotate(0deg);
-            }
-          }
-
-          @media (max-width: 480px) {
-            .slot-machine-card {
-              padding: 18px 12px 14px !important;
-              border-radius: 22px !important;
-            }
-
-            .slot-machine-header {
-              font-size: 0.98rem !important;
-              padding: 7px 14px !important;
-              margin-bottom: 12px !important;
-            }
-
-            .slot-machine-reel {
-              height: 260px !important;
-              border-radius: 18px !important;
-            }
-
-            .slot-machine-result-card {
-              padding-left: 12px !important;
-              padding-right: 12px !important;
-            }
-
-            .slot-machine-reel-row {
-              left: 12px !important;
-              right: 12px !important;
-              padding-left: 12px !important;
-              padding-right: 12px !important;
-            }
-          }
-
-          @media (prefers-reduced-motion: reduce) {
-            .slot-machine-reel-track {
-              transition-duration: 900ms !important;
-            }
-          }
-        `}
-      </style>
-
-      <div className="slot-machine-card" style={cardStyle}>
-        <div style={shimmerStripStyle("top")} />
-        <div style={shimmerStripStyle("bottom")} />
-
-        <div className="slot-machine-header" style={headerStyle}>
-          ⚔️ Category Roulette ⚔️
+          <canvas
+            ref={canvasRef}
+            style={{
+              ...styles.canvas,
+              boxShadow: winnerIndex >= 0
+                ? `0 0 0 3px ${accentColor}, 0 0 32px ${accentColor}88`
+                : "none",
+              transition: "box-shadow 400ms ease",
+            }}
+          />
         </div>
 
-        <div className="slot-machine-reel" style={reelStyle}>
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              background:
-                "repeating-linear-gradient(180deg, rgba(255,255,255,0.052) 0 1px, transparent 1px 6px)",
-              mixBlendMode: "screen",
-              opacity: 0.16,
-              pointerEvents: "none",
-            }}
-          />
-
-          <div
-            style={{
-              position: "absolute",
-              inset: 12,
-              borderRadius: 20,
-              border: "1px solid rgba(199, 125, 255, 0.12)",
-              pointerEvents: "none",
-              zIndex: 2,
-            }}
-          />
-
-          <div style={centerBarStyle} />
-
-          {phase === "intro" && (
+        {/* Result / countdown area */}
+        <div style={styles.resultArea}>
+          {winner && (phase === "landed" || phase === "result") && (
             <div
               style={{
-                position: "absolute",
-                inset: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: 18,
-                zIndex: 5,
-                animation: "slotIntroIn 360ms ease-out both",
+                ...styles.resultBadge,
+                border: `1px solid ${accentColor}`,
+                background: `${accentColor}22`,
+                boxShadow: `0 0 20px ${accentColor}44`,
+                animation: "swReveal 420ms cubic-bezier(.2,.9,.25,1.2) both",
               }}
             >
-              <div
-                style={{
-                  position: "relative",
-                  width: "min(430px, 92%)",
-                  padding: "22px 18px",
-                  borderRadius: 24,
-                  border: "1px solid rgba(199, 125, 255, 0.42)",
-                  background:
-                    "linear-gradient(145deg, rgba(42,13,74,0.92), rgba(23,6,48,0.94))",
-                  boxShadow:
-                    "0 18px 38px rgba(0,0,0,0.34), inset 0 0 26px rgba(199,125,255,0.1)",
-                  overflow: "hidden",
-                  textAlign: "center",
-                }}
-              >
-                <div
-                  style={{
-                    position: "absolute",
-                    top: 0,
-                    bottom: 0,
-                    width: "45%",
-                    background:
-                      "linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent)",
-                    animation: "slotScanner 950ms ease-in-out infinite",
-                  }}
-                />
-
-                <div
-                  style={{
-                    color: "#f0e8ff",
-                    fontFamily: "var(--font-ui)",
-                    fontSize: "0.72rem",
-                    fontWeight: 900,
-                    letterSpacing: "2px",
-                    marginBottom: 8,
-                    opacity: 0.9,
-                  }}
-                >
-                  PREPARING CATEGORY
-                </div>
-
-                <div
-                  style={{
-                    color: INTRO_ACCENT,
-                    fontFamily: "var(--font-display)",
-                    fontSize: "clamp(2rem, 10vw, 3.8rem)",
-                    lineHeight: 1,
-                    textShadow: `0 0 24px ${INTRO_ACCENT}88`,
-                    animation: "slotPulse 900ms ease-in-out infinite",
-                  }}
-                >
-                  {shuffleEmoji}
-                </div>
-
-                <div
-                  style={{
-                    marginTop: 10,
-                    color: "#f0e8ff",
-                    fontFamily: "var(--font-display)",
-                    fontSize: "clamp(1rem, 4vw, 1.36rem)",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                >
-                  Shuffling...
-                </div>
-              </div>
-            </div>
-          )}
-
-          {phase !== "intro" && (
-            <div
-              className="slot-machine-reel-track"
-              style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                top: 0,
-                height: reelItems.length * ROW_HEIGHT,
-                transform: `translate3d(0, ${spinTranslate}px, 0)`,
-                transition:
-                  phase === "spin"
-                    ? `transform ${SPIN_DURATION}ms cubic-bezier(0.08, 0.82, 0.18, 1)`
-                    : "none",
-                willChange: phase === "spin" ? "transform" : "auto",
-                zIndex: 1,
-              }}
-            >
-              {reelItems.map((item) => {
-                const isWinner = landed && item.reelIndex === finalIndex;
-
-                return (
-                  <div
-                    key={`${item.reelIndex}-${item.name}`}
-                    className="slot-machine-reel-row"
-                    style={{
-                      position: "absolute",
-                      top: item.reelIndex * ROW_HEIGHT + 6,
-                      left: 18,
-                      right: 18,
-                      height: 46,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      gap: 10,
-                      padding: "0 16px",
-                      borderRadius: 999,
-                      border: `1px solid ${
-                        isWinner
-                          ? item.accent
-                          : "rgba(90, 45, 138, 0.72)"
-                      }`,
-                      background: isWinner
-                        ? `linear-gradient(90deg, ${item.accent}2e, rgba(255,255,255,0.14), ${item.accent}24)`
-                        : "rgba(42, 13, 74, 0.76)",
-                      color: "#f0e8ff",
-                      fontFamily: "var(--font-display)",
-                      fontSize: "clamp(0.92rem, 3vw, 1.18rem)",
-                      letterSpacing: "1px",
-                      opacity: landed ? (isWinner ? 1 : 0.08) : 0.92,
-                      transform: `scale(${isWinner ? 1.08 : 1})`,
-                      filter: landed && !isWinner ? "blur(1px)" : "none",
-                      boxShadow: isWinner
-                        ? `0 0 28px ${item.accent}72, inset 0 0 20px ${item.accent}24`
-                        : "0 8px 16px rgba(0, 0, 0, 0.22)",
-                      transition:
-                        "opacity 360ms ease, transform 360ms ease, filter 360ms ease, box-shadow 360ms ease",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    <span style={{ fontSize: "1.18em" }}>{item.emoji}</span>
-
-                    <span
-                      style={{
-                        minWidth: 0,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
-                    >
-                      {item.name}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          <div
-            style={{
-              position: "absolute",
-              left: 0,
-              top: "50%",
-              width: 5,
-              height: 88,
-              transform: "translateY(-50%)",
-              borderRadius: "0 999px 999px 0",
-              background: landed ? accent : "rgba(199, 125, 255, 0.4)",
-              boxShadow: landed ? `0 0 24px ${accent}` : "none",
-              transition: "all 360ms ease",
-              zIndex: 5,
-            }}
-          />
-
-          <div
-            style={{
-              position: "absolute",
-              right: 0,
-              top: "50%",
-              width: 5,
-              height: 88,
-              transform: "translateY(-50%)",
-              borderRadius: "999px 0 0 999px",
-              background: landed ? accent : "rgba(199, 125, 255, 0.4)",
-              boxShadow: landed ? `0 0 24px ${accent}` : "none",
-              transition: "all 360ms ease",
-              zIndex: 5,
-            }}
-          />
-
-          <div style={fadeStyle("top")} />
-          <div style={fadeStyle("bottom")} />
-        </div>
-
-        <div
-          style={{
-            minHeight: 128,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 10,
-            marginTop: 14,
-          }}
-        >
-          {resultVisible && (
-            <div
-              className="slot-machine-result-card"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-                maxWidth: "100%",
-                padding: "10px 18px",
-                borderRadius: 18,
-                border: `1px solid ${accent}`,
-                background: `linear-gradient(135deg, ${accent}22, rgba(255,255,255,0.08))`,
-                boxShadow: `0 0 26px ${accent}44`,
-                animation:
-                  "slotResultIn 420ms cubic-bezier(.2,.9,.25,1.2) both",
-              }}
-            >
-              <span style={{ fontSize: "2rem", lineHeight: 1 }}>
-                {selectedCategory.emoji}
-              </span>
-
-              <span style={{ minWidth: 0 }}>
-                <span
-                  style={{
-                    display: "block",
-                    color: accent,
-                    fontFamily: "var(--font-ui)",
-                    fontSize: "0.68rem",
-                    fontWeight: 900,
-                    letterSpacing: "2px",
-                    lineHeight: 1,
-                  }}
-                >
-                  CATEGORY
-                </span>
-
-                <span
-                  style={{
-                    display: "block",
-                    color: "#f0e8ff",
-                    fontFamily: "var(--font-display)",
-                    fontSize: "clamp(1rem, 4vw, 1.42rem)",
-                    lineHeight: 1.1,
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {selectedCategory.name}
+              <span style={{ fontSize: "1.8rem" }}>{winner.emoji}</span>
+              <span>
+                <span style={styles.catLabel}>CATEGORY</span>
+                <span style={{ ...styles.catName, color: accentColor }}>
+                  {winner.name}
                 </span>
               </span>
             </div>
@@ -797,13 +393,11 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
             <div
               key={countdown}
               style={{
-                color: accent,
-                fontFamily: "var(--font-display)",
-                fontSize: countdown === 0 ? "4rem" : "4.8rem",
-                lineHeight: 0.92,
-                textShadow: `0 0 26px ${accent}88, 0 5px 0 rgba(0, 0, 0, 0.42)`,
-                animation:
-                  "slotCountPop 280ms cubic-bezier(.18,.9,.28,1.32) both",
+                ...styles.countdown,
+                color: accentColor,
+                textShadow: `0 0 24px ${accentColor}88, 0 4px 0 rgba(0,0,0,0.5)`,
+                fontSize: countdown === 0 ? "3.4rem" : "4rem",
+                animation: "swCountPop 280ms cubic-bezier(.18,.9,.28,1.32) both",
               }}
             >
               {countdown === 0 ? "⚔️" : countdown}
@@ -814,3 +408,158 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
     </div>
   );
 }
+
+// ─── Styles ──────────────────────────────────────────────────────────────────
+
+const styles = {
+  overlay: {
+    position: "fixed",
+    inset: 0,
+    zIndex: 9999,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 12,
+    background:
+      "radial-gradient(circle at top, rgba(90,45,138,0.45), transparent 42%), rgba(26,5,51,0.94)",
+    backdropFilter: "blur(6px)",
+    WebkitBackdropFilter: "blur(6px)",
+    animation: "swFade 220ms ease-out both",
+  },
+  card: {
+    position: "relative",
+    width: "min(420px, calc(100vw - 24px))",
+    maxHeight: "calc(100vh - 24px)",
+    overflow: "hidden",
+    padding: "16px 16px 18px",
+    background: "linear-gradient(175deg, #2a0d4a, #1e0838, #170630)",
+    border: "1.5px solid #5a2d8a",
+    borderRadius: 24,
+    boxShadow:
+      "0 24px 72px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08)",
+    display: "flex",
+    flexDirection: "column",
+    gap: 14,
+  },
+  strip: (edge) => ({
+    position: "absolute",
+    left: 16,
+    right: 16,
+    [edge]: 8,
+    height: 4,
+    borderRadius: 999,
+    background:
+      "linear-gradient(90deg, #c77dff, #00e5ff, #ff4da6, #ffe135, #69ff47, #ff7043, #c77dff)",
+    backgroundSize: "300% 100%",
+    animation: "swRainbow 2.2s linear infinite",
+    opacity: 0.75,
+  }),
+  header: {
+    width: "fit-content",
+    maxWidth: "100%",
+    margin: "0 auto",
+    padding: "7px 18px",
+    borderRadius: 999,
+    border: "1px solid rgba(199,125,255,0.42)",
+    background: "rgba(199,125,255,0.1)",
+    color: "#f0e8ff",
+    fontFamily: "var(--font-display, sans-serif)",
+    fontSize: "clamp(0.95rem, 4vw, 1.2rem)",
+    letterSpacing: "1px",
+    textAlign: "center",
+    textShadow: "0 2px 0 rgba(0,0,0,0.4)",
+  },
+  wheelWrap: {
+    position: "relative",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pointer: {
+    position: "absolute",
+    top: -2,
+    left: "50%",
+    transform: "translateX(-50%)",
+    width: 0,
+    height: 0,
+    borderLeft: "11px solid transparent",
+    borderRight: "11px solid transparent",
+    borderTop: "26px solid #c77dff",
+    filter: "drop-shadow(0 2px 6px rgba(199,125,255,0.8))",
+    zIndex: 10,
+  },
+  canvas: {
+    width: "100%",
+    maxWidth: 360,
+    height: "auto",
+    aspectRatio: "1",
+    display: "block",
+    borderRadius: "50%",
+    border: "2px solid rgba(90,45,138,0.9)",
+  },
+
+  resultArea: {
+    minHeight: 100,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  resultBadge: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    padding: "9px 18px",
+    borderRadius: 16,
+    maxWidth: "100%",
+  },
+  catLabel: {
+    display: "block",
+    color: "#f0e8ff",
+    fontFamily: "var(--font-ui, sans-serif)",
+    fontSize: "0.65rem",
+    fontWeight: 900,
+    letterSpacing: "2px",
+    lineHeight: 1,
+    opacity: 0.7,
+  },
+  catName: {
+    display: "block",
+    fontFamily: "var(--font-display, sans-serif)",
+    fontSize: "clamp(1rem, 4vw, 1.36rem)",
+    lineHeight: 1.15,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  countdown: {
+    fontFamily: "var(--font-display, sans-serif)",
+    lineHeight: 0.92,
+    animation: "swCountPop 280ms cubic-bezier(.18,.9,.28,1.32) both",
+  },
+};
+
+const css = `
+  @keyframes swFade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes swRainbow {
+    from { background-position: 0% 50%; }
+    to   { background-position: 300% 50%; }
+  }
+  @keyframes swReveal {
+    0%   { opacity: 0; transform: translateY(12px) scale(0.94); }
+    72%  { opacity: 1; transform: translateY(-2px) scale(1.03); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes swCountPop {
+    0%   { opacity: 0; transform: scale(0.45) rotate(-8deg); }
+    62%  { opacity: 1; transform: scale(1.16) rotate(2deg); }
+    100% { opacity: 1; transform: scale(1) rotate(0deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation-duration: 400ms !important; }
+  }
+`;

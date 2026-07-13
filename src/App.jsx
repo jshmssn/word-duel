@@ -29,7 +29,7 @@ import {
   IconHourglass,
 } from "./icons/Icons.jsx";
 
-const SERVER_URL = "word-duel-server-production.up.railway.app";
+const SERVER_URL = "https://word-duel-server.onrender.com";
 // const SERVER_URL = "localhost:3001";
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 

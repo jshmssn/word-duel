@@ -34,7 +34,7 @@ const SERVER_URL =
   import.meta.env.VITE_SERVER_URL ||
   (import.meta.env.DEV
     ? "http://localhost:3001"
-    : "https://word-duel-server-production.up.railway.app");
+    : "https://word-duel-server.onrender.com");
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 const AVATAR_COLORS = [

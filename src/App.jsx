@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { io } from "socket.io-client";
 import SlotMachine from "./SlotMachine.jsx";
+import WordChainMode from "./WordChainMode.jsx";
 import {
   IconSword,
   IconShield,
@@ -29,8 +30,11 @@ import {
   IconHourglass,
 } from "./icons/Icons.jsx";
 
-const SERVER_URL = "https://word-duel-server.onrender.com";
-// const SERVER_URL = "localhost:3001";
+const SERVER_URL =
+  import.meta.env.VITE_SERVER_URL ||
+  (import.meta.env.DEV
+    ? "http://localhost:3001"
+    : "https://word-duel-server-production.up.railway.app");
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 const AVATAR_COLORS = [
@@ -383,7 +387,7 @@ function GameLogPanel({ log = [], emptyContent, className = "" }) {
   );
 }
 
-function LobbyScreen({ onCreated, onJoined }) {
+function LobbyScreen({ onCreated, onJoined, onWordChain }) {
   const [username, setUsername] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [tab, setTab] = useState("create");
@@ -569,6 +573,16 @@ function LobbyScreen({ onCreated, onJoined }) {
                 <div className="btn-icon-row">
                   <IconTarget size={20} color="currentColor" />
                   Practice vs Bot
+                </div>
+              </button>
+              <button
+                className="btn-fun btn-fun-purple"
+                onClick={onWordChain}
+                disabled={loading}
+              >
+                <div className="btn-icon-row">
+                  <IconLetters size={20} color="currentColor" />
+                  Play Word Chain
                 </div>
               </button>
             </div>
@@ -2168,7 +2182,15 @@ export default function App() {
 
   if (screen === "lobby") {
     screenContent = (
-      <LobbyScreen onCreated={handleRoomCreated} onJoined={handleRoomJoined} />
+      <LobbyScreen
+        onCreated={handleRoomCreated}
+        onJoined={handleRoomJoined}
+        onWordChain={() => setScreen("word-chain")}
+      />
+    );
+  } else if (screen === "word-chain") {
+    screenContent = (
+      <WordChainMode socket={getSocket()} onExit={() => setScreen("lobby")} />
     );
   } else if (screen === "waiting") {
     screenContent = (

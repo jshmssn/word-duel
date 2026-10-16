@@ -32,9 +32,11 @@ import {
   IconHourglass,
 } from "./icons/Icons.jsx";
 
-// const SERVER_URL = "word-duel-server-production.up.railway.app";
-// A deployed client can point to a separately deployed server using VITE_SERVER_URL.
-const SERVER_URL = import.meta.env.VITE_SERVER_URL || "http://localhost:3001";
+const SERVER_URL =
+  import.meta.env.VITE_SERVER_URL ||
+  (import.meta.env.DEV
+    ? "http://localhost:3001"
+    : "https://word-duel-server.onrender.com");
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 const AVATAR_COLORS = [

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import ModalOverlay from "./ModalOverlay.jsx";
 import {
   IconSword, IconLightning, IconChat, IconShield, IconTarget,
   IconLetters, IconCheck, IconX, IconClock,
@@ -84,7 +85,7 @@ export function RulesDialog({ onClose }) {
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
   return (
-    <div className="prompt-overlay rules-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <ModalOverlay className="rules-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <div className="rules-dialog" role="dialog" aria-modal="true" aria-labelledby="rules-heading">
         <div className="rules-top"><span className="eyebrow"><IconLightning size={14} color="currentColor" /> THE PLAYBOOK</span><button className="close-circle" onClick={onClose} aria-label="Close instructions"><IconX size={17} color="currentColor" /></button></div>
         <h2 id="rules-heading">One word. Two minds.<br /><span>Only one winner.</span></h2>
@@ -95,7 +96,7 @@ export function RulesDialog({ onClose }) {
         </div>
         <div className="rules-foot"><span><IconCheck size={15} color="currentColor" /> Ask, deduce, win.</span><button onClick={onClose} className="btn-fun btn-fun-yellow">Got it <span aria-hidden="true">↗</span></button></div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }
 

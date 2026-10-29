@@ -84,6 +84,20 @@ cd word-duel
 npm run build
 ```
 
+Responsive browser checks cover the lobby, host/guest waiting rooms, countdown,
+category roulette, game controls, letter prompts, winning/losing results, and chat.
+They run in Chromium and WebKit at thirteen phone, landscape, tablet, and desktop sizes,
+including chat rotation, simulated keyboard resizing, and overlapping dialogs:
+
+```bash
+npx playwright install chromium webkit
+npm run test:mobile
+```
+
+These checks simulate Socket.IO events in the browser and do not require the game
+server. They verify client layout and interactions; live multiplayer behavior
+still requires the separate server.
+
 The build output appears in `word-duel/dist/`. The Socket.IO server must be deployed separately, with the Vite environment variable pointing to it.
 
 ## Notes

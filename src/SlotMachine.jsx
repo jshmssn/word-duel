@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { isAudioEnabled } from "./audio.js";
+import ModalOverlay from "./components/ModalOverlay.jsx";
 
 const CATEGORIES = [
   { name: "Traditional Games", emoji: "🎲" },
@@ -297,13 +298,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
   };
 
   const overlayStyle = {
-    position: "fixed",
-    inset: 0,
     zIndex: 9999,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 18,
     background: "rgba(6, 11, 23, 0.89)",
     backdropFilter: "blur(6px)",
     WebkitBackdropFilter: "blur(6px)",
@@ -312,9 +307,6 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
 
   const cardStyle = {
     position: "relative",
-    width: "min(680px, calc(100vw - 28px))",
-    maxHeight: "calc(100vh - 28px)",
-    overflow: "hidden",
     padding: "22px 18px 18px",
     background: "linear-gradient(160deg, #222f4a, #141f35, #10192d)",
     border: "1px solid #566686",
@@ -409,8 +401,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
   });
 
   return (
-    <div style={overlayStyle} role="dialog" aria-modal="true" aria-label="Category selection animation">
-      <button onClick={skipIntro} disabled={doneCalledRef.current} type="button" style={{ position: "absolute", zIndex: 2, top: 18, right: 20, padding: "11px 15px", border: "1px solid #526280", borderRadius: 10, background: "#1b2a47", color: "#d9e5f8", fontFamily: "var(--font-ui)", fontWeight: 700, fontSize: 12 }}>Skip intro →</button>
+    <ModalOverlay style={overlayStyle} role="dialog" aria-modal="true" aria-label="Category selection animation">
       <style>
         {`
           @keyframes slotOverlayFade {
@@ -456,7 +447,10 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
         `}
       </style>
 
-      <div style={cardStyle}>
+      <div className="slot-dialog" style={cardStyle}>
+        <div className="slot-dialog-controls">
+          <button onClick={skipIntro} disabled={doneCalledRef.current} type="button" style={{ padding: "11px 15px", border: "1px solid #526280", borderRadius: 10, background: "#1b2a47", color: "#d9e5f8", fontFamily: "var(--font-ui)", fontWeight: 700, fontSize: 12 }}>Skip intro →</button>
+        </div>
         <div style={shimmerStripStyle("top")} />
         <div style={shimmerStripStyle("bottom")} />
 
@@ -671,6 +665,6 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
           )}
         </div>
       </div>
-    </div>
+    </ModalOverlay>
   );
 }

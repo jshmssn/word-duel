@@ -4,6 +4,8 @@ import SlotMachine from "./SlotMachine.jsx";
 import { SFX, playTone, isAudioEnabled, setAudioEnabled } from "./audio.js";
 import { ExperienceShell, ConfettiBurst, ProgressBar, RulesDialog, SectionHeading, StepsPreview } from "./components/Experience.jsx";
 import LetterWorkbench from "./components/LetterWorkbench.jsx";
+import FloatingChat from "./components/FloatingChat.jsx";
+import ModalOverlay from "./components/ModalOverlay.jsx";
 import {
   IconSword,
   IconShield,
@@ -12,7 +14,6 @@ import {
   IconChat,
   IconTrophy,
   IconSkull,
-  IconSend,
   IconCheck,
   IconX,
   IconLightning,
@@ -78,101 +79,6 @@ let socket = null;
 function getSocket() {
   if (!socket) socket = io(SERVER_URL);
   return socket;
-}
-
-// ─── Floating Chat Button ─────────────────────────────────────────────────────
-function FloatingChat({ messages, onSend, myId, isOpen, onToggle, unread }) {
-  const [text, setText] = useState("");
-  const bottomRef = useRef(null);
-
-  useEffect(() => {
-    if (isOpen) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isOpen]);
-
-  const send = () => {
-    const t = text.trim();
-    if (!t) return;
-    onSend(t);
-    setText("");
-  };
-  const fmt = (ts) =>
-    new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-
-  return (
-    <div className="floating-chat-wrap">
-      {isOpen && (
-        <div className="floating-chat-panel">
-          <div className="chat-header-fun">
-            <IconChat size={18} color="var(--cyan)" />
-            Room Chat
-            <button className="btn-close-chat" onClick={onToggle}>
-              <IconX size={14} color="currentColor" />
-            </button>
-          </div>
-          <div className="chat-messages" style={{ height: 320 }}>
-            {messages.length === 0 && (
-              <div className="chat-system-msg icon-msg">
-                <IconChat size={13} color="currentColor" />
-                No messages yet. Say hi!
-              </div>
-            )}
-            {messages.map((msg) =>
-              msg.system ? (
-                <div key={msg.id} className="chat-system-msg">
-                  {msg.text}
-                </div>
-              ) : (
-                <div
-                  key={msg.id}
-                  className={`chat-bubble ${msg.playerId === myId ? "mine" : "theirs"}`}
-                >
-                  <div className="chat-bubble-meta">
-                    <span>
-                      {msg.username}
-                      {msg.playerId === myId ? " (you)" : ""}
-                    </span>
-                    <span style={{ opacity: 0.6 }}>{fmt(msg.timestamp)}</span>
-                  </div>
-                  <div className="chat-bubble-inner">{msg.text}</div>
-                </div>
-              ),
-            )}
-            <div ref={bottomRef} />
-          </div>
-          <div className="chat-input-row">
-            <input
-              className="chat-input-fun"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && send()}
-              placeholder="Say something..."
-              maxLength={200}
-            />
-            <button
-              className="btn-send-fun"
-              onClick={send}
-              disabled={!text.trim()}
-            >
-              <IconSend size={18} color="currentColor" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      <button
-        className="floating-chat-btn"
-        onClick={onToggle}
-        title="Open Chat"
-      >
-        <IconChat size={24} color="white" />
-        {unread > 0 && (
-          <span className="chat-unread-badge">
-            {unread > 9 ? "9+" : unread}
-          </span>
-        )}
-      </button>
-    </div>
-  );
 }
 
 // ─── Turn Timer ───────────────────────────────────────────────────────────────
@@ -333,7 +239,7 @@ function LobbyScreen({ onCreated, onJoined, connected }) {
               <button type="button" role="tab" aria-selected={tab === "create"} className={`tab-pill ${tab === "create" ? "active" : ""}`} onClick={() => {setTab("create"); setError("");}}><IconHome size={17} color="currentColor" /> Create room</button>
               <button type="button" role="tab" aria-selected={tab === "join"} className={`tab-pill ${tab === "join" ? "active" : ""}`} onClick={() => {setTab("join"); setError("");}}><IconRocket size={17} color="currentColor" /> Join room</button>
             </div>
-            {tab === "join" && <label className="field-group enter-from-right" htmlFor="room-join-code"><span className="field-label">8-CHARACTER ROOM CODE</span><input id="room-join-code" className="fun-input code-input-fun" value={joinCode} onChange={(e) => { setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")); setError(""); }} onKeyDown={(e) => e.key === "Enter" && handleJoin()} placeholder="ENTER CODE" maxLength={8} /></label>}
+            {tab === "join" && <label className="field-group enter-from-right" htmlFor="room-join-code"><span className="field-label">8-CHARACTER ROOM CODE</span><input id="room-join-code" autoCapitalize="characters" autoCorrect="off" spellCheck={false} enterKeyHint="go" className="fun-input code-input-fun" value={joinCode} onChange={(e) => { setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")); setError(""); }} onKeyDown={(e) => e.key === "Enter" && handleJoin()} placeholder="ENTER CODE" maxLength={8} /></label>}
             {error && <div className="error-bubble" role="alert"><IconWarning size={16} color="currentColor" /> {error}</div>}
             {!connected && !error && <div className="connection-notice" role="status">Connecting to game server…</div>}
             {tab === "create" ? <div className="create-actions"><button className="btn-fun btn-fun-yellow" onClick={handleCreate} disabled={loading || !connected}><span className="btn-icon-row"><IconLightning size={19} color="currentColor" /> {loading ? "Opening arena…" : "Create a duel"} <span className="action-arrow">↗</span></span></button><button className="btn-fun btn-fun-ghost" onClick={handleCreateBotRoom} disabled={loading || !connected}><span className="btn-icon-row"><IconTarget size={19} color="currentColor" /> Practice vs bot <span className="action-arrow">→</span></span></button></div> : <button className="btn-fun btn-fun-yellow" onClick={handleJoin} disabled={loading || !connected}><span className="btn-icon-row"><IconRocket size={18} color="currentColor" /> {loading ? "Finding room…" : "Join the duel"} <span className="action-arrow">↗</span></span></button>}
@@ -480,7 +386,7 @@ function WaitingScreen({
               <div className="player-slots">
                 {[0, 1].map((i) => { const p = players[i]; const [c1, c2] = avatarGrad(i); return <div key={i} className={`player-card ${p ? "filled" : "empty"} ${p?.ready ? "ready-yes" : ""}`}>
                   <div className="player-avatar-fun" style={p ? { background: `linear-gradient(135deg,${c1},${c2})` } : {}}>{p ? p.username[0].toUpperCase() : "?"}</div>
-                  <div className="player-ident"><div className="player-name-fun">{p ? p.username : "Awaiting challenger"}{p?.id === myId && <span className="you-tag">YOU</span>}{p?.isBot && <span className="you-tag">BOT</span>}</div><div className="player-meta-row">{p ? <span><IconTrophy size={13} color="currentColor" /> {p.wins || 0} WINS</span> : <span>SHARE YOUR INVITE CODE ABOVE</span>}</div></div>
+                  <div className="player-ident"><div className="player-name-fun"><span className="player-display-name">{p ? p.username : "Awaiting challenger"}</span>{p?.id === myId && <span className="you-tag">YOU</span>}{p?.isBot && <span className="you-tag">BOT</span>}</div><div className="player-meta-row">{p ? <span><IconTrophy size={13} color="currentColor" /> {p.wins || 0} WINS</span> : <span>SHARE YOUR INVITE CODE ABOVE</span>}</div></div>
                   {p ? <span className={`ready-pill ${p.ready ? "yes" : "no"}`}>{p.ready ? <><IconCheck size={13} color="currentColor" /> READY</> : "NOT READY"}</span> : <span className="empty-player-pulse"><span className="pulse-dot" /></span>}
                 </div>; })}
               </div>
@@ -499,7 +405,7 @@ function WaitingScreen({
           </aside>
         </div>
       </div>
-      {countdown !== null && <div className="countdown-overlay" role="status"><div className="countdown-card"><span className="eyebrow">GET READY</span><div className="countdown-num" key={countdown}>{countdown}</div><div className="countdown-label-fun"><IconLightning size={19} color="currentColor" /> DUEL STARTING</div></div></div>}
+      {countdown !== null && <ModalOverlay className="countdown-overlay" role="status"><div className="countdown-card"><span className="eyebrow">GET READY</span><div className="countdown-num" key={countdown}>{countdown}</div><div className="countdown-label-fun"><IconLightning size={19} color="currentColor" /> DUEL STARTING</div></div></ModalOverlay>}
       {showSlotMachine && selectedCategory && <SlotMachine selectedCategoryName={selectedCategory} onDone={handleSlotMachineDone} />}
       <FloatingChat messages={chatMessages} onSend={onChat} myId={myId} isOpen={chatOpen} onToggle={handleChatToggle} unread={unread} />
     </div>
@@ -815,8 +721,7 @@ function GameScreen({
         {opponentLeft && <div className="disconnect-banner"><span className="inline-icon-row"><IconWarning size={18} color="currentColor" /> Opponent disconnected.</span><button className="btn-fun btn-fun-ghost" onClick={onReturnToWaiting}>Back to room</button></div>}
         {/* Letter ask/count prompt (for opponent) */}
         {(letterAskPrompt || letterCountPrompt) && (
-          <div
-            className="prompt-overlay"
+          <ModalOverlay
             role="dialog"
             aria-modal="true"
             aria-labelledby={
@@ -911,6 +816,9 @@ function GameScreen({
                 <div className="prompt-count-row">
                   <input
                     type="number"
+                    inputMode="numeric"
+                    enterKeyHint="send"
+                    aria-label="Letter count"
                     min={0}
                     max={20}
                     className="fun-input prompt-count-input"
@@ -932,7 +840,7 @@ function GameScreen({
                 </div>
               </div>
             )}
-          </div>
+          </ModalOverlay>
         )}
 
 
@@ -1001,6 +909,11 @@ function GameScreen({
                   <div className="action-input-row">
                     <input
                       className="single-key-input"
+                      aria-label="Letter to ask"
+                      autoCapitalize="characters"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      enterKeyHint="send"
                       value={letterInput}
                       maxLength={1}
                       onChange={(e) =>
@@ -1058,6 +971,11 @@ function GameScreen({
                 <div className="action-input-row action-input-row-guess">
                   <input
                     className="guess-input"
+                    aria-label="Your word guess"
+                    autoCapitalize="characters"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    enterKeyHint="go"
                     value={guessInput}
                     onChange={(e) => setGuessInput(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleGuess()}

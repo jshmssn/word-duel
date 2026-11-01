@@ -10,6 +10,7 @@ const AudioContextClass = typeof window !== "undefined"
   ? window.AudioContext || window.webkitAudioContext
   : null;
 let context = null;
+let lastColorAdjustment = -Infinity;
 
 export function isAudioEnabled() { return enabled; }
 export function setAudioEnabled(value) {
@@ -61,6 +62,23 @@ export const SFX = {
   confirm: () => sequence([520, 660], "triangle", 0.12, 0.085),
   correctGuess: () => sequence([785, 1047, 1319], "sine", 0.2, 0.095),
   timeout: () => playTone(260, "triangle", 0.22, 0.16),
+  colorMemorize: () => sequence([659, 988, 1319], "sine", 0.12, 0.13),
+  colorMix: () => sequence([392, 523, 784], "triangle", 0.13, 0.08),
+  colorAdjust: (channel, value) => {
+    // A slider can emit dozens of events per second; keep its feedback gentle.
+    const now = performance.now();
+    if (!enabled || now - lastColorAdjustment < 85) return;
+    lastColorAdjustment = now;
+    playTone(220 + (value / (channel === "h" ? 359 : 100)) * 440, "sine", 0.045, 0.035);
+  },
+  colorSubmit: () => sequence([587, 784, 1175], "triangle", 0.13, 0.075),
+  colorEdit: () => sequence([784, 587], "sine", 0.10, 0.07),
+  colorReview: () => sequence([523, 784, 1047, 1319], "sine", 0.14, 0.11),
+  colorRanking: () => sequence([392, 494, 587, 784], "triangle", 0.14, 0.1),
+  voteOpen: () => sequence([660, 880, 660, 988], "sine", 0.12, 0.12),
+  voteSelect: (choice) => sequence(choice === "yes" ? [660, 880] : [660, 494], "triangle", 0.13, 0.075),
+  votePassed: () => sequence([659, 880, 1047], "triangle", 0.12, 0.07),
+  voteKept: () => sequence([587, 494], "sine", 0.10, 0.12),
   timerWarning: (remaining) => {
     if (remaining <= 5 || remaining % 2 === 0) playTone(760, "sine", 0.06, 0.065);
   },

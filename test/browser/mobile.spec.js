@@ -113,10 +113,14 @@ for (const [width, height] of viewports) {
         askerId: "mobile-player", askerName: players[0].username,
         letter: "A", hasLetter: true, confirmedLetters: ["C", "A", "T"],
       });
+      const cluesTab = page.getByRole("tab", { name: "Clues & word" });
+      if (await cluesTab.isVisible()) await cluesTab.tap();
       await expect(page.locator(".workbench-tile").first()).toHaveText("C");
       await page.locator(".workbench-tile").first().tap();
       await page.locator(".workbench-tile").nth(12).tap();
       await expect(page.locator(".workbench-tile").nth(12)).toHaveText("C");
+      const moveTab = page.getByRole("tab", { name: "Make a move" });
+      if (await moveTab.isVisible()) await moveTab.tap();
 
       await page.getByRole("button", { name: "Letter Count", exact: true }).tap();
       await checkLayout(page);
@@ -227,7 +231,7 @@ test.describe("mobile viewport changes and long content", () => {
     await page.getByRole("button", { name: "Close instructions" }).tap();
     expect(await page.evaluate(() => getComputedStyle(document.body).overflowY)).toBe("hidden");
     await page.getByRole("button", { name: "Yes", exact: true }).tap();
-    await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).overflowY)).not.toBe("hidden");
+    await expect.poll(() => page.evaluate(() => getComputedStyle(document.body).overflowY)).toBe("hidden");
   });
 
   test("letter count prompt fits a keyboard that resizes and pans the visual viewport", async ({ page }) => {

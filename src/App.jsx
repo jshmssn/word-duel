@@ -1,3 +1,4 @@
+import TurnTimer from "./components/TurnTimer.jsx";
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { io } from "socket.io-client";
 import SlotMachine from "./SlotMachine.jsx";
@@ -5,6 +6,8 @@ import { SFX, playTone, isAudioEnabled, setAudioEnabled } from "./audio.js";
 import { ExperienceShell, ConfettiBurst, ProgressBar, RulesDialog, SectionHeading, StepsPreview } from "./components/Experience.jsx";
 import LetterWorkbench from "./components/LetterWorkbench.jsx";
 import FloatingChat from "./components/FloatingChat.jsx";
+import useToasts from "./hooks/useToasts.js";
+import { readRoomSession, saveRoomSession, clearRoomSession } from "./roomSession.js";
 import ModalOverlay from "./components/ModalOverlay.jsx";
 import { ColorCardGameView, ColorCardResultsView } from "./components/ColorCard.jsx";
 import {
@@ -83,41 +86,6 @@ function getSocket() {
 }
 
 // ─── Turn Timer ───────────────────────────────────────────────────────────────
-function TurnTimer({ remaining, total, isMyTurn }) {
-  if (!total) return null;
-  const pct = Math.max(0, (remaining / total) * 100);
-  const danger = remaining <= 10;
-  const urgent = remaining <= 5;
-
-  return (
-    <div className={`turn-timer-wrap ${danger ? "timer-danger" : ""}`}>
-      <div className="timer-label">
-        <span className="timer-label-title">
-          <IconClock size={14} color="currentColor" />
-          {isMyTurn ? "Your Time" : "Opponent's Time"}
-        </span>
-        <span className={`timer-seconds ${urgent ? "timer-urgent" : ""}`}>
-          {remaining}s
-        </span>
-      </div>
-      <div className="timer-bar-bg">
-        <div
-          className="timer-bar-fill"
-          style={{
-            width: `${pct}%`,
-            background: urgent
-              ? "var(--red)"
-              : danger
-                ? "#FFA500"
-                : "var(--green)",
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
-// ─── Lobby ───────────────────────────────────────────────────────────────────
 function GameLogPanel({ log = [], emptyContent, className = "" }) {
   const logBoxRef = useRef(null);
 
@@ -146,42 +114,47 @@ function ColorCardSettings({ duration, count, onDurationChange, onCountChange })
   </div>;
 }
 
-function LobbyScreen({ onCreated, onJoined, connected }) {
+function LobbyScreen({ onCreated, onJoined, connected, gameMode, onModeChange, onFeedback }) {
   const [username, setUsername] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [tab, setTab] = useState("create");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [gameMode, setGameMode] = useState("word-duel");
   const [maxPlayers, setMaxPlayers] = useState(2);
   const [colorDuration, setColorDuration] = useState(30);
   const [colorCardCount, setColorCardCount] = useState(5);
 
   useEffect(() => {
     const sock = getSocket();
-    sock.on("room-created", ({ code, turnDuration, roundLimit, creatorId, players, mode, gameMode, maxPlayers, colorDuration, colorCardCount }) => {
+    const handleCreated = ({ code, turnDuration, roundLimit, creatorId, players, mode, gameMode, maxPlayers, colorDuration, colorCardCount }) => {
       setLoading(false);
       onCreated(code, username.trim(), turnDuration, creatorId, players, roundLimit, mode, gameMode, maxPlayers, colorDuration, colorCardCount);
-    });
-    sock.on("room-joined", (details) => {
+    };
+    const handleJoined = (details) => {
       setLoading(false);
       onJoined(details);
-    });
-    sock.on("join-error", ({ message }) => {
+    };
+    const handleError = ({ message }) => {
       setLoading(false);
       setError(message);
-    });
-    return () => {
-      sock.off("room-created");
-      sock.off("room-joined");
-      sock.off("join-error");
     };
-  }, [username, onCreated]);
+    sock.on("room-created", handleCreated);
+    sock.on("room-joined", handleJoined);
+    sock.on("join-error", handleError);
+    return () => {
+      sock.off("room-created", handleCreated);
+      sock.off("room-joined", handleJoined);
+      sock.off("join-error", handleError);
+    };
+  }, [username, onCreated, onJoined]);
+  useEffect(() => { if (!connected) setLoading(false); }, [connected]);
+
+  const reportError = (message) => { setError(message); onFeedback(message, "error"); };
 
   const handleCreate = () => {
-    if (!connected) { setError("The game server is offline. Check that it is running."); return; }
+    if (!connected) { reportError("The game server is offline. Check that it is running."); return; }
     if (!username.trim()) {
-      setError("Enter your name first!");
+      reportError("Enter your name first!");
       return;
     }
     setError("");
@@ -195,9 +168,9 @@ function LobbyScreen({ onCreated, onJoined, connected }) {
   };
 
   const handleCreateBotRoom = () => {
-    if (!connected) { setError("The game server is offline. Check that it is running."); return; }
+    if (!connected) { reportError("The game server is offline. Check that it is running."); return; }
     if (!username.trim()) {
-      setError("Enter your name first!");
+      reportError("Enter your name first!");
       return;
     }
     setError("");
@@ -208,13 +181,13 @@ function LobbyScreen({ onCreated, onJoined, connected }) {
   };
 
   const handleJoin = () => {
-    if (!connected) { setError("The game server is offline. Check that it is running."); return; }
+    if (!connected) { reportError("The game server is offline. Check that it is running."); return; }
     if (!username.trim()) {
-      setError("Enter your name first!");
+      reportError("Enter your name first!");
       return;
     }
     if (!joinCode.trim()) {
-      setError("Enter a room code!");
+      reportError("Enter a room code!");
       return;
     }
     setError("");
@@ -225,22 +198,32 @@ function LobbyScreen({ onCreated, onJoined, connected }) {
     });
   };
 
+  const isColorCard = gameMode === "color-card";
+
   return (
     <div className="screen lobby-screen">
       <div className="lobby-layout">
         <section className="hero-panel">
-          <div className="hero-eyebrow"><span className="eyebrow-line" /> THE REAL-TIME WORD ARENA <span className="eyebrow-spark">✦</span></div>
-          <h1 className="hero-headline">WORDS ARE<br /><span>YOUR WEAPON.</span></h1>
-          <p className="hero-description">Choose your challenge. Decode secret words in Word Duel or mix the closest match in Color Card with up to eight players.</p>
-          <div className="hero-tags"><span><IconLightning size={15} color="currentColor" /> 2–8 PLAYER ROOMS</span><span><IconTarget size={15} color="currentColor" /> SOLO PRACTICE</span><span><IconTrophy size={15} color="currentColor" /> BEST OF 3 OR 5</span></div>
-          <div className="arena-preview" aria-label="A sample letter puzzle">
+          <div className="hero-eyebrow"><span className="eyebrow-line" /> GAMIFYLUV · PLAY TOGETHER <span className="eyebrow-spark">✦</span></div>
+          <div className="mode-discovery" aria-label="Explore game modes">
+            <button type="button" className={isColorCard ? "" : "selected"} aria-pressed={!isColorCard} onClick={() => onModeChange("word-duel")}><IconSword size={20} color="currentColor" /><span><strong>Word Duel</strong><small>Ask. Deduce. Outspell.</small></span></button>
+            <button type="button" className={isColorCard ? "selected" : ""} aria-pressed={isColorCard} onClick={() => onModeChange("color-card")}><span className="color-mode-icon" aria-hidden="true" /><span><strong>Color Card</strong><small>Remember. Mix. Match.</small></span></button>
+          </div>
+          <h1 className="hero-headline">YOUR PEOPLE.<br /><span>YOUR PLAYGROUND.</span></h1>
+          <p className="platform-description">Crack secret words in <strong>Word Duel</strong> or test your color memory in <strong>Color Card</strong>. Two ways to challenge your friends. One place to play.</p>
+          <div key={gameMode} className="mode-hero-copy">
+          <h2 className="mode-preview-heading">{isColorCard ? "Color Card · Trust your color memory." : "Word Duel · Words are your weapon."}</h2>
+          <p className="hero-description">{isColorCard ? "Five seconds to remember a color. One blank card to recreate it. Mix your best match and climb the rankings with up to eight friends." : "A secret word. A room full of rivals. Ask about letters, piece together your clues, and crack the next player’s word before they crack yours."}</p>
+          <div className="hero-tags"><span><IconLightning size={15} color="currentColor" /> 2–8 PLAYER ROOMS</span><span><IconTarget size={15} color="currentColor" /> {isColorCard ? "5-SECOND MEMORY TEST" : "SOLO BOT PRACTICE"}</span><span><IconTrophy size={15} color="currentColor" /> {isColorCard ? "CLOSEST COLOR WINS" : "BEST OF 3 OR 5"}</span></div>
+          {isColorCard ? <div className="arena-preview color-arena-preview" aria-label="A sample color memory challenge"><div className="preview-top"><span className="preview-pill"><span className="connection-dot" /> COLOR CARD</span><span className="preview-subtitle">REMEMBER THE SHADE</span></div><div className="color-demo-cards"><div className="color-demo-original"><span>THE ORIGINAL</span><strong>05<small>SECONDS TO REMEMBER</small></strong></div><div className="color-demo-match"><span>YOUR MATCH</span><strong>98.6%<small>HOW CLOSE CAN YOU GET?</small></strong></div></div><div className="preview-foot"><span>✦ Memorize → Mix → Compare</span><span>PLAY IN FULL COLOR</span></div></div> : <div className="arena-preview" aria-label="A sample letter puzzle">
             <div className="preview-top"><span className="preview-pill"><span className="connection-dot" /> ROUND IN PROGRESS</span><span className="preview-subtitle">YOUR CLUE BOARD <span aria-hidden="true">↗</span></span></div>
             <div className="preview-matchup"><div className="preview-player"><span className="preview-avatar preview-you">Y</span><span>YOU <small>DETECTIVE</small></span></div><div className="preview-versus">VS</div><div className="preview-player right"><span>RIVAL <small>WORD KEEPER</small></span><span className="preview-avatar preview-rival">R</span></div></div>
             <div className="preview-letter-label"><span>UNPOSITIONED CLUES</span><span>2 / 6 LETTERS FOUND</span></div>
             <div className="preview-tiles"><span className="mock-letter revealed">A</span><span className="mock-letter revealed">E</span><span className="mock-letter">·</span><span className="mock-letter">·</span><span className="mock-letter">·</span><span className="mock-letter">·</span></div>
             <div className="preview-foot"><span>✦ Known letters, unknown positions</span><span>33% DISCOVERED</span></div><div className="preview-progress"><span /></div>
+          </div>}
+          <div className="hero-bottom">NO DOWNLOADS <span>✦</span> PICK A GAME. SHARE A CODE. PLAY.</div>
           </div>
-          <div className="hero-bottom">NO DOWNLOADS <span>✦</span> NO GUESSWORK — JUST SKILL.</div>
         </section>
         <section className="lobby-entry">
           <div className="entry-top"><span className="eyebrow"><IconSword size={16} color="currentColor" /> YOUR NEXT CHALLENGE</span><span className="entry-orbit">✳</span></div>
@@ -255,7 +238,7 @@ function LobbyScreen({ onCreated, onJoined, connected }) {
               <button type="button" role="tab" aria-selected={tab === "join"} className={`tab-pill ${tab === "join" ? "active" : ""}`} onClick={() => {setTab("join"); setError("");}}><IconRocket size={17} color="currentColor" /> Join room</button>
             </div>
             {tab === "create" && <div className="create-room-settings">
-              <label className="field-group" htmlFor="room-game-mode"><span className="field-label">GAME MODE</span><select id="room-game-mode" className="fun-input timer-select" value={gameMode} onChange={(event) => setGameMode(event.target.value)}><option value="word-duel">Word Duel</option><option value="color-card">Color Card</option></select></label>
+              <label className="field-group" htmlFor="room-game-mode"><span className="field-label">GAME MODE</span><select id="room-game-mode" className="fun-input timer-select" value={gameMode} onChange={(event) => onModeChange(event.target.value)}><option value="word-duel">Word Duel</option><option value="color-card">Color Card</option></select></label>
               <label className="field-group" htmlFor="room-max-players"><span className="field-label">MAX NUMBER OF PLAYERS</span><select id="room-max-players" className="fun-input timer-select" value={maxPlayers} onChange={(event) => setMaxPlayers(Number(event.target.value))}>{Array.from({ length: 7 }, (_, index) => index + 2).map((count) => <option key={count} value={count}>{count} players</option>)}</select></label>
               {gameMode === "color-card" && <ColorCardSettings duration={colorDuration} count={colorCardCount} onDurationChange={setColorDuration} onCountChange={setColorCardCount} />}
             </div>}
@@ -264,10 +247,10 @@ function LobbyScreen({ onCreated, onJoined, connected }) {
             {!connected && !error && <div className="connection-notice" role="status">Connecting to game server…</div>}
             {tab === "create" ? <div className="create-actions"><button className="btn-fun btn-fun-yellow" onClick={handleCreate} disabled={loading || !connected}><span className="btn-icon-row"><IconLightning size={19} color="currentColor" /> {loading ? "Opening arena…" : gameMode === "word-duel" ? "Create a duel" : "Create Color Card room"} <span className="action-arrow">↗</span></span></button>{gameMode === "word-duel" && <button className="btn-fun btn-fun-ghost" onClick={handleCreateBotRoom} disabled={loading || !connected}><span className="btn-icon-row"><IconTarget size={19} color="currentColor" /> Practice vs bot (2 players) <span className="action-arrow">→</span></span></button>}</div> : <button className="btn-fun btn-fun-yellow" onClick={handleJoin} disabled={loading || !connected}><span className="btn-icon-row"><IconRocket size={18} color="currentColor" /> {loading ? "Finding room…" : "Join room"} <span className="action-arrow">↗</span></span></button>}
           </div>
-          <div className="entry-bottom"><span className="entry-star">✦</span><div><strong>THINK QUICK. SPELL FASTER.</strong><p>No sign-up required. Invite a friend or face a bot.</p></div></div>
+          <div className="entry-bottom"><span className="entry-star">✦</span><div><strong>{isColorCard ? "A LITTLE MEMORY. A LOT OF COLOR." : "THINK QUICK. SPELL FASTER."}</strong><p>{isColorCard ? "No sign-up required. Invite friends and compare your colors." : "No sign-up required. Invite a friend or face a bot."}</p></div></div>
         </section>
       </div>
-      <div className="lobby-howto"><div className="mini-section-name">THE PATH TO VICTORY <span> / 3 EASY STEPS</span></div><StepsPreview /></div>
+      <div className="lobby-howto" key={gameMode}><div className="mini-section-name">{isColorCard ? "COLOR CARD" : "WORD DUEL"}: THE PATH TO VICTORY <span> / 3 EASY STEPS</span></div><StepsPreview gameMode={gameMode} /></div>
     </div>
   );
 }
@@ -292,6 +275,8 @@ function WaitingScreen({
   isCreator,
   onTurnDurationChange,
   onRoundLimitChange,
+  onFeedback,
+  recoveryCategory,
 }) {
   const [countdown, setCountdown] = useState(null);
   const [showSlotMachine, setShowSlotMachine] = useState(false);
@@ -302,6 +287,9 @@ function WaitingScreen({
   const prevMsgCount = useRef(chatMessages.length);
   const myPlayer = players.find((p) => p.id === myId);
   const imReady = Boolean(myPlayer?.ready);
+  useEffect(() => {
+    if (recoveryCategory) { setSelectedCategory(recoveryCategory); setShowSlotMachine(true); }
+  }, [recoveryCategory]);
 
   useEffect(() => {
     if (!chatOpen && chatMessages.length > prevMsgCount.current) {
@@ -332,9 +320,10 @@ function WaitingScreen({
         if (!success) throw new Error("Clipboard unavailable");
       }
       setCopied(true);
+      onFeedback("Room code copied. Invite your friends!", "success");
       SFX.confirm();
       setTimeout(() => setCopied(false), 1800);
-    } catch { window.prompt("Copy this room code:", code); }
+    } catch { onFeedback(`Could not copy. Your room code is ${code}.`, "error"); }
   };
 
   const handleReady = () => {
@@ -413,7 +402,7 @@ function WaitingScreen({
               <div className="player-slots">
                 {Array.from({ length: maxPlayers }, (_, index) => index).map((i) => { const p = players[i]; const [c1, c2] = avatarGrad(i); return <div key={i} className={`player-card ${p ? "filled" : "empty"} ${p?.ready ? "ready-yes" : ""}`}>
                   <div className="player-avatar-fun" style={p ? { background: `linear-gradient(135deg,${c1},${c2})` } : {}}>{p ? p.username[0].toUpperCase() : "?"}</div>
-                  <div className="player-ident"><div className="player-name-fun"><span className="player-display-name">{p ? p.username : "Awaiting challenger"}</span>{p?.id === myId && <span className="you-tag">YOU</span>}{p?.isBot && <span className="you-tag">BOT</span>}</div><div className="player-meta-row">{p ? <span><IconTrophy size={13} color="currentColor" /> {p.wins || 0} WINS</span> : <span>SHARE YOUR INVITE CODE ABOVE</span>}</div></div>
+                  <div className="player-ident"><div className="player-name-fun"><span className="player-display-name">{p ? p.username : "Awaiting challenger"}</span>{p?.id === myId && <span className="you-tag">YOU</span>}{p?.isBot && <span className="you-tag">BOT</span>}</div><div className="player-meta-row">{p ? isColorCard ? <span className="player-accuracy-stat" title={p.previousMatchCardCount ? `Average accuracy from the previous completed match (${p.previousMatchCardCount} cards)` : "No previous match recorded"}><IconTarget size={13} color="currentColor" /><strong>{(p.previousMatchAverageAccuracy ?? 0).toFixed(2)}%</strong> LAST MATCH AVG.</span> : <span><IconTrophy size={13} color="currentColor" /> {p.wins || 0} WINS</span> : <span>SHARE YOUR INVITE CODE ABOVE</span>}</div></div>
                   {p ? <span className={`ready-pill ${p.ready ? "yes" : "no"}`}>{p.ready ? <><IconCheck size={13} color="currentColor" /> READY</> : "NOT READY"}</span> : <span className="empty-player-pulse"><span className="pulse-dot" /></span>}
                 </div>; })}
               </div>
@@ -462,23 +451,34 @@ function GameScreen({
     turnDuration,
   } = gameState;
   const [activeTab, setActiveTab] = useState("ask");
+  const [workspace, setWorkspace] = useState("play");
   const [letterInput, setLetterInput] = useState("");
   const [guessInput, setGuessInput] = useState("");
-  const [confirmedLetters, setConfirmedLetters] = useState([]);
-  const [askedLetters, setAskedLetters] = useState({});
+  const [confirmedLetters, setConfirmedLetters] = useState(gameState.confirmedLetters || []);
+  const [askedLetters, setAskedLetters] = useState(gameState.askedLetters || {});
   const [turn, setTurn] = useState(currentTurn);
   const [chatOpen, setChatOpen] = useState(false);
   const [unread, setUnread] = useState(0);
-  const [timerRemaining, setTimerRemaining] = useState(turnDuration || 0);
+  const [timerRemaining, setTimerRemaining] = useState(gameState.timerRemaining ?? turnDuration ?? 0);
   const [timerTotal, setTimerTotal] = useState(turnDuration || 0);
 
   // Letter ask prompt (for opponent to answer)
-  const [letterAskPrompt, setLetterAskPrompt] = useState(null); // { askerName, letter }
-  const [letterCountPrompt, setLetterCountPrompt] = useState(null); // { askerName, letter }
+  const [letterAskPrompt, setLetterAskPrompt] = useState(gameState.letterAskPrompt || null);
+  const [letterCountPrompt, setLetterCountPrompt] = useState(gameState.letterCountPrompt || null);
   const [letterCountInput, setLetterCountInput] = useState("");
 
   // Waiting state (asker is waiting for opponent response)
-  const [waitingFor, setWaitingFor] = useState(null);
+  const [waitingFor, setWaitingFor] = useState(gameState.waitingFor || null);
+  useEffect(() => {
+    if (!gameState.recoveredAt) return;
+    setConfirmedLetters(gameState.confirmedLetters || []);
+    setAskedLetters(gameState.askedLetters || {});
+    setTurn(gameState.currentTurn);
+    setTimerRemaining(gameState.timerRemaining ?? gameState.turnDuration ?? 0);
+    setLetterAskPrompt(gameState.letterAskPrompt || null);
+    setLetterCountPrompt(gameState.letterCountPrompt || null);
+    setWaitingFor(gameState.waitingFor || null);
+  }, [gameState.recoveredAt]);
 
   // Disconnection
   const [opponentLeft, setOpponentLeft] = useState(false);
@@ -548,6 +548,8 @@ function GameScreen({
           }));
           if (hasLetter) { SFX.ding(); rewardPop(`✦ Letter ${letter} discovered`); }
           else onFeedback(`No ${letter} in their word. Keep hunting.`, "info");
+        } else {
+          onFeedback(`${askerName} asked about ${letter}: ${hasLetter ? "yes" : "no"}.`);
         }
         addLog({
           type: hasLetter ? "yes" : "no",
@@ -581,6 +583,8 @@ function GameScreen({
             [letter]: Number(count) > 0 ? "yes" : "no",
           }));
           rewardPop(`${letter} appears ${count} time${count === 1 ? "" : "s"}`, "success");
+        } else {
+          onFeedback(`${responderName || askerName}: ${letter} appears ${count} time${count === 1 ? "" : "s"}.`);
         }
         addLog({
           type: "count",
@@ -592,6 +596,7 @@ function GameScreen({
 
     sock.on("wrong-guess", ({ guesserName, guess }) => {
       if (guesserName === players.find((p) => p.id === myId)?.username) onFeedback(`Not ${guess.toUpperCase()} — your next turn is a new chance.`, "error");
+      else onFeedback(`${guesserName} guessed ${guess.toUpperCase()}. Incorrect!`);
       addLog({
         type: "wrong",
         icon: <IconBoom size={14} color="currentColor" />,
@@ -615,6 +620,7 @@ function GameScreen({
           text: fromTimeout ? "Time's up! Now your turn." : "Your turn!",
         });
         SFX.yourTurn();
+        onFeedback("Your turn! Ask a letter or guess the word.", "success");
       } else {
         addLog({
           type: "info",
@@ -626,6 +632,7 @@ function GameScreen({
 
     sock.on("turn-timeout", ({ playerId }) => {
       SFX.timeout();
+      onFeedback(playerId === myId ? "Time’s up! Your turn has passed." : `${players.find((player) => player.id === playerId)?.username || "Opponent"} ran out of time.`, "error");
       addLog({
         type: "warn",
         icon: <IconClock size={14} color="currentColor" />,
@@ -644,17 +651,20 @@ function GameScreen({
     // Prompt: opponent is asking a letter
     sock.on("letter-ask-prompt", ({ askerName, letter }) => {
       setLetterAskPrompt({ askerName, letter });
+      onFeedback(`${askerName} is asking about ${letter}.`);
     });
 
     // Prompt: opponent is asking for letter count
     sock.on("letter-count-prompt", ({ askerName, letter }) => {
       setLetterCountPrompt({ askerName, letter });
       setLetterCountInput("");
+      onFeedback(`${askerName} wants the count for ${letter}.`);
     });
 
     // Asker is waiting
     sock.on("waiting-for-response", ({ action, letter }) => {
       setWaitingFor({ action, letter });
+      onFeedback(`Question sent. Waiting for the answer about ${letter}.`);
     });
 
     sock.on("game-over", (data) => {
@@ -668,14 +678,15 @@ function GameScreen({
       onGameOver(data);
     });
 
-    sock.on("player-left", ({ username, disconnected }) => {
+    const handlePlayerLeft = ({ username, disconnected }) => {
       addLog({
         type: "info",
         icon: <IconX size={14} color="currentColor" />,
         text: `${username} left.`,
       });
       if (disconnected) setOpponentLeft(true);
-    });
+    };
+    sock.on("player-left", handlePlayerLeft);
 
     return () => {
       sock.off("letter-result");
@@ -688,7 +699,7 @@ function GameScreen({
       sock.off("letter-count-prompt");
       sock.off("waiting-for-response");
       sock.off("game-over");
-      sock.off("player-left");
+      sock.off("player-left", handlePlayerLeft);
     };
   }, [myId, opponent, players, addLog, onGameOver, onFeedback, rewardPop]);
 
@@ -873,16 +884,18 @@ function GameScreen({
         )}
 
 
-        <div className="game-grid">
+        <div className="workspace-tabs" role="tablist" aria-label="Game panels">{[["clues", "Clues & word"], ["play", "Make a move"], ["activity", "Activity"]].map(([id, label]) => <button key={id} type="button" role="tab" id={`workspace-tab-${id}`} aria-controls={`workspace-${id}`} aria-selected={workspace === id} onClick={() => setWorkspace(id)}>{label}</button>)}</div>
+        <div className={`game-grid workspace-${workspace}`}>
           <div className="game-main-column">
-            <div className="word-panels">
+            <div className="word-panels workspace-panel" id="workspace-clues" aria-labelledby="workspace-tab-clues">
               <div className="word-card my-card"><div className="word-card-title"><IconShield size={17} color="var(--mint)" /> YOUR SECRET WORD <span className="secret-pill">TOP SECRET</span></div><div className="my-word-text">{myWord.toUpperCase()}</div><div className="secret-bottom">{myWordLetterCount} LETTERS <span>·</span> DON'T GIVE IT AWAY</div></div>
               <div className="word-card opp-card"><div className="word-card-title"><IconTarget size={17} color="var(--cyan)" /> CRACK THEIR WORD <span className="target-length">{opponentLetterCount} LETTERS</span></div>
                 {players.length > 2 && <p className="word-target-name">Investigating {opponent?.username}’s word</p>}
-                <LetterWorkbench confirmed={confirmedLetters} length={opponentLetterCount} onUseGuess={(word) => { setGuessInput(word); setActiveTab("guess"); }} />
+                <LetterWorkbench confirmed={confirmedLetters} length={opponentLetterCount} onUseGuess={(word) => { setGuessInput(word); setActiveTab("guess"); setWorkspace("play"); onFeedback("Letter arrangement added to your guess."); }} onFeedback={onFeedback} />
                 {reward && <div className="reward-pop" key={reward.id}>{reward.message} <span>✦</span></div>}
               </div>
             </div>
+            <div className={`move-panel workspace-panel action-${activeTab}`} id="workspace-play" aria-labelledby="workspace-tab-play">
             <div className="alpha-section"><div className="alpha-section-title"><span><IconLetters size={18} color="currentColor" /> LETTER SCANNER</span><span className="alpha-key-legend"><i className="dot-yes" /> IN WORD <i className="dot-no" /> NOT FOUND</span></div><div className="alphabet-grid-fun">{ALPHABET.map((l) => <button key={l} type="button" className={`alpha-key ${askedLetters[l] === "yes" ? "asked-yes" : askedLetters[l] === "no" ? "asked-no" : ""}`} disabled={!isMyTurn || Boolean(askedLetters[l]) || Boolean(waitingFor)} onClick={() => handleAskLetter(l)} title={askedLetters[l] === "yes" ? "Confirmed letter" : askedLetters[l] === "no" ? "Not in word" : "Ask about this letter"} aria-label={`Ask about ${l}${askedLetters[l] ? `; already ${askedLetters[l] === "yes" ? "confirmed" : "ruled out"}` : ""}`}>{l}</button>)}</div></div>
         {/* Action panel */}
         <div className={`action-card ${!isMyTurn ? "disabled" : ""}`}>
@@ -925,7 +938,7 @@ function GameScreen({
               </div>
 
               {activeTab === "ask" && (
-                <>
+                <div className="manual-letter-action">
                   <div
                     style={{
                       fontFamily: "var(--font-display)",
@@ -968,7 +981,7 @@ function GameScreen({
                       </div>
                     </button>
                   </div>
-                </>
+                </div>
               )}
 
               {activeTab === "count" && confirmedLetters.length > 0 && (
@@ -1036,9 +1049,9 @@ function GameScreen({
             </div>
           )}
         </div>
-
+            </div>
           </div>
-          <aside className="game-sidebar">
+          <aside className="game-sidebar workspace-panel" id="workspace-activity" aria-labelledby="workspace-tab-activity">
             <div className="intel-panel"><div className="side-kicker">MATCH INTELLIGENCE <span>✦</span></div><h3>Every clue counts.</h3><p>Find the letters and build your own guess in the workbench.</p><div className="intel-stats"><div><strong>{confirmedLetters.length}</strong><small>LETTERS FOUND</small></div><div><strong>{Object.keys(askedLetters).length}</strong><small>LETTERS ASKED</small></div><div><strong>{opponentLetterCount}</strong><small>WORD LENGTH</small></div></div><ProgressBar value={confirmedLetters.length} max={opponentLetterCount} color="mint" label="Discovery progress" /></div>
             <div className="feed-panel"><SectionHeading kicker="THE MATCH SO FAR" title="Live activity" right={<IconChat size={17} color="var(--muted)" />} /><GameLogPanel log={gameLogs} emptyContent={<div className="log-row info"><span className="log-icon"><IconHourglass size={14} color="currentColor" /></span>{isMyTurn ? "Your move. Ask or guess!" : `${currentPlayer?.username} goes first.`}</div>} /></div>
             <div className="tip-panel"><span className="tip-icon"><IconBulb size={18} color="currentColor" /></span><div><strong>PRO TIP</strong><p>Known letters reveal what exists, <em>not where it goes.</em> Rearrange the tiles to test your theory.</p></div></div>
@@ -1111,7 +1124,7 @@ function AnimatedRevealWord({ label, word, variant, delay = 0 }) {
   );
 }
 
-function GameOverScreen({ result, myId, onRematch, chatMessages, onChat }) {
+function GameOverScreen({ result, myId, onRematch, chatMessages, onChat, onQuit, leaving }) {
   const isWinner = result.winnerId === myId;
   const resultPlayers = Array.isArray(result.players) ? result.players : [];
   const opponent = resultPlayers.find((player) => player.id === result.opponentsByPlayer?.[myId]) || resultPlayers.find((player) => player.id !== myId);
@@ -1254,12 +1267,12 @@ function GameOverScreen({ result, myId, onRematch, chatMessages, onChat }) {
           </button>
           <button
             className="btn-fun btn-fun-ghost"
-            onClick={() => window.location.reload()}
-            disabled={!revealDone}
+            onClick={onQuit}
+            disabled={leaving}
           >
             <div className="btn-icon-row">
               <IconX size={18} color="currentColor" />
-              Leave
+              {leaving ? "Quitting…" : "Quit room"}
             </div>
           </button>
         </div>
@@ -1290,6 +1303,7 @@ export default function App() {
   const [roundLimit, setRoundLimit] = useState(1);
   const [roomMode, setRoomMode] = useState("duel");
   const [gameMode, setGameMode] = useState("word-duel");
+  const [selectedMode, setSelectedMode] = useState("word-duel");
   const [maxPlayers, setMaxPlayers] = useState(2);
   const [colorDuration, setColorDuration] = useState(30);
   const [colorCardCount, setColorCardCount] = useState(5);
@@ -1298,32 +1312,109 @@ export default function App() {
   const [connected, setConnected] = useState(() => getSocket().connected);
   const [audioEnabled, setAudioEnabledState] = useState(isAudioEnabled);
   const [showRules, setShowRules] = useState(false);
-  const [toast, setToast] = useState(null);
-  const toastTimeout = useRef(null);
+  const { toasts, notify: showFeedback, dismiss: dismissToast } = useToasts();
+  const [leaving, setLeaving] = useState(false);
+  const roster = useRef([]);
+  const lastVoteNotice = useRef("");
+  const currentColorRound = useRef(null);
+  const identity = useRef(readRoomSession()?.playerId || getSocket().id);
+  const [roomPause, setRoomPause] = useState(null);
+  const [restoring, setRestoring] = useState(Boolean(readRoomSession()));
+  const [recoveryCategory, setRecoveryCategory] = useState(null);
 
-  const showFeedback = useCallback((message, tone = "info") => {
-    clearTimeout(toastTimeout.current);
-    setToast({ id: Date.now() + Math.random(), message, tone });
-    toastTimeout.current = setTimeout(() => setToast(null), 2400);
+  const resetRoom = useCallback(() => {
+    setRoomCode(""); setPlayers([]); roster.current = [];
+    setGameState(null); setGameOverResult(null); setGameLogs([]); setChatMessages([]);
+    setCreatorId(null); setShowRules(false); setScreen("lobby");
+    setRoomPause(null); setRestoring(false); setRecoveryCategory(null);
+    currentColorRound.current = null;
+    clearRoomSession();
   }, []);
-  useEffect(() => () => clearTimeout(toastTimeout.current), []);
+
+  const handleQuit = async () => {
+    if (leaving) return;
+    SFX.tap();
+    if (!connected) { resetRoom(); showFeedback("You left the room.", "success"); return; }
+    setLeaving(true);
+    try {
+      const response = await getSocket().timeout(5000).emitWithAck("leave-room", { code: roomCode });
+      if (!response.success) { showFeedback(response.message || "Could not leave the room.", "error"); return; }
+      resetRoom();
+      showFeedback("You quit the room.", "success");
+    } catch { showFeedback("No server confirmation. Please try quitting again.", "error"); }
+    finally { setLeaving(false); }
+  };
 
   useEffect(() => {
     const sock = getSocket();
-    const onConnect = () => { setConnected(true); setMyId(sock.id); };
-    const onDisconnect = () => { setConnected(false); };
+    const onSession = (session) => { saveRoomSession(session); identity.current = session.playerId; setMyId(session.playerId); };
+    const onRestored = (state) => {
+      const clock = typeof state.serverNow === "number" ? state.serverNow - Date.now() : 0;
+      identity.current = state.playerId;
+      setMyId(state.playerId); setRoomCode(state.code); setPlayers(state.players); roster.current = state.players;
+      setCreatorId(state.creatorId); setGameMode(state.gameMode); setRoomMode(state.mode);
+      setMaxPlayers(state.maxPlayers); setTurnDuration(state.turnDuration); setRoundLimit(state.roundLimit);
+      setColorDuration(state.colorDuration); setColorCardCount(state.colorCardCount);
+      setChatMessages(state.chatMessages || []);
+      setGameState(state.gameState ? { ...state.gameState, code: state.code, serverClockOffset: clock, pausedAt: state.pausedAt, recoveredAt: Date.now() } : null);
+      setGameOverResult(state.result ? { ...state.result, serverClockOffset: clock, pausedAt: state.pausedAt } : null);
+      currentColorRound.current = state.gameMode === "color-card" ? state.gameState?.roundId : null;
+      setScreen(state.screen);
+      setRecoveryCategory(state.pendingCategory || null);
+      setRoomPause(state.pausedAt ? { message: "Waiting for the other players to reconnect. Timers are paused." } : null);
+      setRestoring(false); setConnected(true);
+    };
+    const onConnect = async () => {
+      setConnected(true);
+      const session = readRoomSession();
+      if (!session) { identity.current = sock.id; setMyId(sock.id); return; }
+      setRestoring(true);
+      try {
+        const response = await sock.timeout(5000).emitWithAck("resume-room", session);
+        if (!response.success) { resetRoom(); showFeedback(response.message, "error"); }
+      } catch { setRestoring(false); setRoomPause({ message: "Could not restore the room yet. Reconnecting…" }); showFeedback("Room recovery is taking longer than expected. Tap Reconnect to retry.", "error"); }
+    };
+    const onDisconnect = () => {
+      setConnected(false);
+      if (readRoomSession()) {
+        setRoomPause({ message: "Reconnecting to your room. Your seat is reserved for 90 seconds." });
+        setGameState((previous) => previous ? { ...previous, pausedAt: Date.now() + (previous.serverClockOffset || 0) } : previous);
+        setGameOverResult((previous) => previous ? { ...previous, pausedAt: Date.now() + (previous.serverClockOffset || 0) } : previous);
+      }
+      showFeedback("Connection lost. Reconnecting to your room…", "error");
+    };
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") {
+        const session = readRoomSession();
+        if (sock.connected && session) sock.emit("suspend-room", { code: session.code });
+        return;
+      }
+      if (!sock.connected) sock.connect();
+      else if (readRoomSession()) onConnect();
+    };
+    const onError = () => showFeedback("The server is unavailable. Reconnecting…", "error");
     sock.on("connect", onConnect);
     sock.on("disconnect", onDisconnect);
+    sock.on("connect_error", onError);
+    sock.on("room-session", onSession);
+    sock.on("room-restored", onRestored);
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onVisible);
     if (sock.connected) onConnect();
-    return () => { sock.off("connect", onConnect); sock.off("disconnect", onDisconnect); };
-  }, []);
+    return () => {
+      sock.off("connect", onConnect); sock.off("disconnect", onDisconnect); sock.off("connect_error", onError);
+      sock.off("room-session", onSession); sock.off("room-restored", onRestored);
+      document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("online", onVisible);
+    };
+  }, [resetRoom, showFeedback]);
 
   const toggleSound = useCallback(() => {
     const next = !audioEnabled;
     setAudioEnabled(next);
     setAudioEnabledState(next);
+    showFeedback(`Sound ${next ? "enabled" : "muted"}.`, "success");
     if (next) SFX.confirm();
-  }, [audioEnabled]);
+  }, [audioEnabled, showFeedback]);
 
   const addSystemChat = useCallback((text) => {
     setChatMessages((prev) => [
@@ -1356,7 +1447,11 @@ export default function App() {
       maxPlayers: capacity,
       colorDuration: cd,
       colorCardCount: cc,
+      joinedPlayerId,
     }) => {
+      const joined = pl.find((player) => player.id === joinedPlayerId && player.id !== identity.current);
+      if (joined) showFeedback(`${joined.username} joined the room.`, "success");
+      roster.current = pl;
       setPlayers(pl);
       if (td !== undefined) setTurnDuration(td);
       if (rl !== undefined) setRoundLimit(rl);
@@ -1367,28 +1462,40 @@ export default function App() {
       if (cd !== undefined) setColorDuration(cd);
       if (cc !== undefined) setColorCardCount(cc);
     };
-    const handleReadyUpdate = ({ players: pl, creatorId: cid }) => {
+    const handleReadyUpdate = ({ players: pl, creatorId: cid, changedPlayerId }) => {
+      pl.forEach((player) => {
+        const previous = roster.current.find((candidate) => candidate.id === player.id);
+        if (player.id === changedPlayerId && previous && previous.ready !== player.ready) showFeedback(`${player.id === identity.current ? "You are" : `${player.username} is`} ${player.ready ? "ready!" : "no longer ready."}`, player.ready ? "success" : "info");
+      });
+      roster.current = pl;
       setPlayers(pl);
       if (cid !== undefined) setCreatorId(cid);
     };
     const handleTurnDurationUpdate = ({ turnDuration: td, creatorId: cid }) => {
       setTurnDuration(td || 0);
+      showFeedback(`Turn timer updated: ${td ? `${td} seconds` : "unlimited"}.`, "success");
       if (cid !== undefined) setCreatorId(cid);
     };
     const handleRoundLimitUpdate = ({ roundLimit: rl, creatorId: cid }) => {
       setRoundLimit(rl || 1);
+      showFeedback(`Match format updated: ${rl > 1 ? `best of ${rl}` : "single round"}.`, "success");
       if (cid !== undefined) setCreatorId(cid);
     };
     const handleColorDurationUpdated = ({ code, colorDuration: duration }) => {
-      if (code === roomCode) setColorDuration(duration);
+      if (code === roomCode) { setColorDuration(duration); showFeedback(`Answer time updated to ${duration} seconds.`, "success"); }
     };
     const handleColorCardCountUpdated = ({ code, colorCardCount: count }) => {
-      if (code === roomCode) setColorCardCount(count);
+      if (code === roomCode) { setColorCardCount(count); showFeedback(`Match updated to ${count} color card${count === 1 ? "" : "s"}.`, "success"); }
     };
     const handleChatHistory = ({ messages }) => setChatMessages(messages);
-    const handleChatMessage = (msg) =>
+    const handleChatMessage = (msg) => {
       setChatMessages((prev) => [...prev, msg]);
+      if (!msg.system) showFeedback(msg.playerId === identity.current ? "Message sent." : `${msg.username}: ${msg.text}`, msg.playerId === identity.current ? "success" : "info");
+    };
     const handleGameStartEvent = (data) => {
+      lastVoteNotice.current = "";
+      currentColorRound.current = data.gameMode === "color-card" ? data.roundId : null;
+      setRecoveryCategory(null);
       setGameState((prev) => ({ ...data, code: roomCode || prev?.code,
         ...(typeof data.serverNow === "number" ? { serverClockOffset: data.serverNow - Date.now() } : {}) }));
       setGameMode(data.gameMode || "word-duel");
@@ -1398,6 +1505,7 @@ export default function App() {
       setGameLogs([]);
       setScreen("game");
       addSystemChat("Game started! Good luck!");
+      showFeedback(data.gameMode === "color-card" ? `Card ${data.roundNumber}: memorize the color!` : "The duel has started. Good luck!", "success");
     };
     const handleRematchLobby = ({
       players: pl,
@@ -1409,8 +1517,11 @@ export default function App() {
       colorDuration: cd,
       colorCardCount: cc,
       message,
+      departure,
+      pausedAt,
     }) => {
       setPlayers(pl);
+      roster.current = pl;
       if (td !== undefined) setTurnDuration(td);
       if (rl !== undefined) setRoundLimit(rl);
       if (cid !== undefined) setCreatorId(cid);
@@ -1421,29 +1532,81 @@ export default function App() {
       setGameState(null);
       setGameOverResult(null);
       setScreen("waiting");
-      addSystemChat(message || "Rematch! Press Ready when you're set.");
+      setRoomPause(pausedAt ? { message: "Waiting for players to reconnect. The room is paused." } : null);
+      if (!departure) { addSystemChat(message || "Rematch! Press Ready when you're set."); showFeedback(message || "Back in the waiting room. Ready for a rematch?"); }
     };
-    const handlePlayerLeft = ({ playerId, username }) => {
-      addSystemChat(`${username} left the room.`);
-      if (screen === "waiting")
-        setPlayers((prev) => prev.filter((p) => playerId ? p.id !== playerId : p.username !== username));
+    const handlePlayerLeft = ({ playerId, username, message, disconnected }) => {
+      if (!message) addSystemChat(`${username} ${disconnected ? "disconnected" : "quit the room"}.`);
+      showFeedback(message || `${username} ${disconnected ? "disconnected" : "quit the room"}.`);
+      roster.current = roster.current.filter((p) => playerId ? p.id !== playerId : p.username !== username);
+      setPlayers(roster.current);
     };
     const handleSubmissionUpdate = ({ code, roundId, submittedPlayerIds }) => {
       setGameState((prev) => prev?.code === code && prev.roundId === roundId ? { ...prev, submittedPlayerIds } : prev);
     };
     const handleColorPickingStarted = ({ code, roundId, phase, roundEndsAt, serverNow }) => {
+      if (code !== roomCode) return;
+      showFeedback("The original is hidden. Time to mix your color!");
       setGameState((prev) => prev?.code === code && prev.roundId === roundId
         ? { ...prev, phase, roundEndsAt, targetColor: null,
           ...(typeof serverNow === "number" ? { serverClockOffset: serverNow - Date.now() } : {}) } : prev);
     };
+    const handleColorSkipVote = ({ code, roundId, vote, serverNow }) => {
+      if (code !== roomCode || roundId !== currentColorRound.current || !vote) return;
+      setGameState((prev) => prev?.code === code && prev.roundId === roundId ? {
+        ...prev, skipVote: vote,
+        ...(typeof serverNow === "number" ? { serverClockOffset: serverNow - Date.now() } : {}),
+      } : prev);
+      const noticeId = `${vote.id}:${vote.status}`;
+      if (lastVoteNotice.current === noticeId) return;
+      lastVoteNotice.current = noticeId;
+      const messages = {
+        active: "Everyone submitted! Vote to show results early. A majority of all players must vote Yes.",
+        passed: "Skip vote passed! Revealing the results.",
+        declined: "Skip vote did not pass. The answer timer continues.",
+        expired: "Voting time ended without a majority. The answer timer continues.",
+        cancelled: "Skip vote cancelled: a player is editing their color.",
+      };
+      if (vote.status === "active") SFX.voteOpen();
+      else if (vote.status === "passed") SFX.votePassed();
+      else SFX.voteKept();
+      showFeedback(messages[vote.status], vote.status === "passed" ? "success" : "info");
+      addSystemChat(messages[vote.status]);
+    };
     const handleRoundResults = (result) => {
+      currentColorRound.current = null;
       setGameMode("color-card");
       setGameOverResult({ ...result, ...(typeof result.serverNow === "number" ? { serverClockOffset: result.serverNow - Date.now() } : {}) });
       setPlayers(result.players);
       setScreen("gameover");
-      addSystemChat(result.phase === "review" ? `Card ${result.roundNumber} finished. Review your color before rankings appear.`
-        : `${result.winners.map((winner) => winner.username).join(", ")} ${result.winners.length > 1 ? "share the win" : "wins"} for card ${result.roundNumber}.`);
+      const announcement = result.phase === "review" ? `Card ${result.roundNumber} finished. Review your color before rankings appear.`
+        : result.winners.length ? `${result.winners.map((winner) => winner.username).join(", ")} ${result.winners.length > 1 ? "share the win" : "wins"} for card ${result.roundNumber}.` : `Card ${result.roundNumber} rankings are ready.`;
+      addSystemChat(announcement);
+      showFeedback(announcement, "success");
     };
+    const handleRoomPaused = (data) => {
+      if (data.code !== roomCode) return;
+      setRoomPause(data); setPlayers(data.players); roster.current = data.players;
+      setGameState((previous) => previous ? { ...previous, pausedAt: data.pausedAt } : previous);
+      setGameOverResult((previous) => previous ? { ...previous, pausedAt: data.pausedAt } : previous);
+      showFeedback(data.message);
+    };
+    const handleRoomResumed = (data) => {
+      if (data.code !== roomCode) return;
+      setRoomPause(null); setRestoring(false);
+      showFeedback(data.message, "success");
+    };
+
+    const notices = {
+      "join-error": ({ message }) => showFeedback(message, "error"),
+      "not-your-turn": () => showFeedback("Wait for your turn before making a move.", "error"),
+      "action-pending": () => showFeedback("Wait for the answer to your current question."),
+      "room-action-error": ({ message }) => showFeedback(message, "error"),
+      "category-selected": ({ category, selectedCategoryName }) => showFeedback(`Category selected: ${selectedCategoryName || category}.`),
+      "countdown": ({ count }) => { if (count === 5) showFeedback("Everyone is ready. The game starts in 5 seconds!"); },
+      "COLOR_PLAYER_ACTION": ({ username, playerId, action }) => { if (playerId !== identity.current) showFeedback(`${username} ${action === "submitted" ? "submitted a color." : "is editing their answer."}`); },
+    };
+    Object.entries(notices).forEach(([event, handler]) => sock.on(event, handler));
 
     sock.on("player-joined", handlePlayerJoined);
     sock.on("ready-update", handleReadyUpdate);
@@ -1457,12 +1620,16 @@ export default function App() {
     sock.on("START_GAME", handleGameStartEvent);
     sock.on("SUBMISSION_UPDATE", handleSubmissionUpdate);
     sock.on("COLOR_PICKING_STARTED", handleColorPickingStarted);
+    sock.on("COLOR_SKIP_VOTE", handleColorSkipVote);
     sock.on("ROUND_RESULTS", handleRoundResults);
     sock.on("COLOR_RANKINGS", handleRoundResults);
     sock.on("rematch-lobby", handleRematchLobby);
     sock.on("player-left", handlePlayerLeft);
+    sock.on("ROOM_PAUSED", handleRoomPaused);
+    sock.on("ROOM_RESUMED", handleRoomResumed);
 
     return () => {
+      Object.entries(notices).forEach(([event, handler]) => sock.off(event, handler));
       sock.off("player-joined", handlePlayerJoined);
       sock.off("ready-update", handleReadyUpdate);
       sock.off("turn-duration-update", handleTurnDurationUpdate);
@@ -1475,12 +1642,15 @@ export default function App() {
       sock.off("START_GAME", handleGameStartEvent);
       sock.off("SUBMISSION_UPDATE", handleSubmissionUpdate);
       sock.off("COLOR_PICKING_STARTED", handleColorPickingStarted);
+      sock.off("COLOR_SKIP_VOTE", handleColorSkipVote);
       sock.off("ROUND_RESULTS", handleRoundResults);
       sock.off("COLOR_RANKINGS", handleRoundResults);
       sock.off("rematch-lobby", handleRematchLobby);
       sock.off("player-left", handlePlayerLeft);
+      sock.off("ROOM_PAUSED", handleRoomPaused);
+      sock.off("ROOM_RESUMED", handleRoomResumed);
     };
-  }, [roomCode, screen, addSystemChat]);
+  }, [roomCode, addSystemChat, showFeedback]);
 
   useEffect(() => {
     if (gameState && roomCode && gameState.code !== roomCode)
@@ -1498,8 +1668,10 @@ export default function App() {
     setColorCardCount(cc || 5);
     setCreatorId(cid || getSocket().id);
     setPlayers(pl || [{ id: getSocket().id, username, ready: false, wins: 0 }]);
+    roster.current = pl || [{ id: getSocket().id, username, ready: false, wins: 0 }];
     setGameLogs([]);
     setScreen("waiting");
+    showFeedback("Room created. Share the code to invite your friends!", "success");
   };
 
   const handleRoomJoined = ({ code, players: joinedPlayers, turnDuration: td, roundLimit: rl, creatorId: cid, mode, gameMode: selectedGameMode, maxPlayers: capacity, colorDuration: cd, colorCardCount: cc }) => {
@@ -1510,6 +1682,7 @@ export default function App() {
     setColorDuration(cd || 30);
     setColorCardCount(cc || 5);
     setPlayers(joinedPlayers || []);
+    roster.current = joinedPlayers || [];
     setTurnDuration(td || 0);
     setRoundLimit(rl || 1);
     setCreatorId(cid || null);
@@ -1521,6 +1694,7 @@ export default function App() {
   const handleGameOver = (result) => {
     setGameOverResult(result);
     setScreen("gameover");
+    showFeedback(`${result.winnerName} wins the round!`, "success");
     const winnerWins =
       result.players?.find((p) => p.id === result.winnerId)?.wins ??
       result.winnerWins;
@@ -1536,8 +1710,9 @@ export default function App() {
   }, []);
 
   const handleRematch = () => getSocket().emit("rematch", { code: roomCode });
-  const handleColorDurationChange = (duration) => getSocket().emit("SET_COLOR_DURATION", { code: roomCode, duration });
-  const handleColorCardCountChange = (count) => getSocket().emit("SET_COLOR_CARD_COUNT", { code: roomCode, count });
+  const settingsResponse = (response) => { if (!response?.success) showFeedback(response?.message || "Could not update room settings.", "error"); };
+  const handleColorDurationChange = (duration) => getSocket().emit("SET_COLOR_DURATION", { code: roomCode, duration }, settingsResponse);
+  const handleColorCardCountChange = (count) => getSocket().emit("SET_COLOR_CARD_COUNT", { code: roomCode, count }, settingsResponse);
 
   const handleTurnDurationChange = useCallback(
     (duration) => {
@@ -1573,18 +1748,18 @@ export default function App() {
   );
 
   let currentView = null;
-  if (screen === "lobby") currentView = <LobbyScreen onCreated={handleRoomCreated} onJoined={handleRoomJoined} connected={connected} />;
-  else if (screen === "waiting") currentView = <WaitingScreen code={roomCode} players={players} myId={myId} gameMode={gameMode} maxPlayers={maxPlayers} colorDuration={colorDuration} onColorDurationChange={handleColorDurationChange} colorCardCount={colorCardCount} onColorCardCountChange={handleColorCardCountChange} gameLogs={gameLogs} chatMessages={chatMessages} onChat={handleChat} onGameStart={handleGameStart} turnDuration={turnDuration} roundLimit={roundLimit} isCreator={creatorId === myId} onTurnDurationChange={handleTurnDurationChange} onRoundLimitChange={handleRoundLimitChange} />;
+  if (screen === "lobby") currentView = <LobbyScreen onCreated={handleRoomCreated} onJoined={handleRoomJoined} connected={connected} gameMode={selectedMode} onModeChange={setSelectedMode} onFeedback={showFeedback} />;
+  else if (screen === "waiting") currentView = <WaitingScreen code={roomCode} players={players} myId={myId} gameMode={gameMode} maxPlayers={maxPlayers} colorDuration={colorDuration} onColorDurationChange={handleColorDurationChange} colorCardCount={colorCardCount} onColorCardCountChange={handleColorCardCountChange} gameLogs={gameLogs} chatMessages={chatMessages} onChat={handleChat} onGameStart={handleGameStart} turnDuration={turnDuration} roundLimit={roundLimit} isCreator={creatorId === myId} onTurnDurationChange={handleTurnDurationChange} onRoundLimitChange={handleRoundLimitChange} onFeedback={showFeedback} recoveryCategory={recoveryCategory} />;
   else if (screen === "game" && gameState) currentView = gameMode === "color-card"
-    ? <ColorCardGameView key={gameState.roundId} gameState={gameState} socket={getSocket()} myId={myId} connected={connected} chatMessages={chatMessages} onChat={handleChat} />
+    ? <ColorCardGameView key={gameState.roundId} gameState={gameState} socket={getSocket()} myId={myId} connected={connected} chatMessages={chatMessages} onChat={handleChat} onFeedback={showFeedback} />
     : <GameScreen gameState={{ ...gameState, code: roomCode, turnDuration, roundLimit }} myId={myId} gameLogs={gameLogs} setGameLogs={setGameLogs} onGameOver={handleGameOver} onReturnToWaiting={handleReturnToWaiting} chatMessages={chatMessages} onChat={handleChat} onFeedback={showFeedback} />;
   else if (screen === "gameover" && gameOverResult) currentView = gameMode === "color-card"
-    ? <ColorCardResultsView key={`${gameOverResult.roundId}:${gameOverResult.phase}`} result={gameOverResult} myId={myId} connected={connected} onRematch={handleRematch} chatMessages={chatMessages} onChat={handleChat} />
-    : <GameOverScreen result={gameOverResult} myId={myId} onRematch={handleRematch} chatMessages={chatMessages} onChat={handleChat} />;
+    ? <ColorCardResultsView key={`${gameOverResult.roundId}:${gameOverResult.phase}`} result={gameOverResult} myId={myId} connected={connected} onRematch={handleRematch} chatMessages={chatMessages} onChat={handleChat} onQuit={handleQuit} leaving={leaving} />
+    : <GameOverScreen result={gameOverResult} myId={myId} onRematch={handleRematch} chatMessages={chatMessages} onChat={handleChat} onQuit={handleQuit} leaving={leaving} />;
   return (
-    <ExperienceShell screen={screen} code={roomCode} connected={connected} audioEnabled={audioEnabled} onAudioToggle={toggleSound} onShowRules={() => setShowRules(true)} toast={toast}>
+    <ExperienceShell screen={screen} code={roomCode} gameMode={gameMode} connected={connected} audioEnabled={audioEnabled} onAudioToggle={toggleSound} onShowRules={() => setShowRules(true)} toasts={toasts} onDismissToast={dismissToast} onQuit={handleQuit} leaving={leaving} roomPause={roomPause} restoring={restoring} onReconnect={() => { const sock = getSocket(); if (sock.connected) sock.emit("resume-room", readRoomSession(), (response) => { if (!response.success) { resetRoom(); showFeedback(response.message, "error"); } }); else sock.connect(); }}>
       {currentView}
-      {showRules && <RulesDialog gameMode={gameMode} onClose={() => setShowRules(false)} />}
+      {showRules && <RulesDialog gameMode={screen === "lobby" ? selectedMode : gameMode} onClose={() => setShowRules(false)} />}
     </ExperienceShell>
   );
 }

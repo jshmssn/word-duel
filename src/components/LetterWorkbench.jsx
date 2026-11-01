@@ -5,7 +5,7 @@ import { reconcileSlots } from "../logic/letterWorkbench.js";
 
 // Letters are *unpositioned clues*. This board stores only a local hypothesis;
 // moving them NEVER reveals or changes server-side word positions.
-export default function LetterWorkbench({ confirmed = [], length = 0, onUseGuess }) {
+export default function LetterWorkbench({ confirmed = [], length = 0, onUseGuess, onFeedback }) {
   const [slots, setSlots] = useState(() => reconcileSlots([], confirmed, length));
   const [selected, setSelected] = useState(null);
   const [dragOver, setDragOver] = useState(null);
@@ -37,6 +37,7 @@ export default function LetterWorkbench({ confirmed = [], length = 0, onUseGuess
   };
 
   const shuffle = () => {
+    onFeedback?.("Letters shuffled.", "success");
     setSlots((previous) => {
       const next = [...previous];
       for (let i = next.length - 1; i > 0; i--) {
@@ -79,7 +80,7 @@ export default function LetterWorkbench({ confirmed = [], length = 0, onUseGuess
       <ProgressBar value={knownCount} max={length} color="mint" label="Letters discovered" />
       <div className="workbench-actions">
         <button className="tiny-action" onClick={shuffle} disabled={knownCount < 2} type="button"><IconDice size={15} color="currentColor" /> Shuffle</button>
-        <button className="tiny-action" onClick={() => { setSlots(reconcileSlots([], confirmed, length)); setSelected(null); }} disabled={knownCount === 0} type="button">Reset</button>
+        <button className="tiny-action" onClick={() => { setSlots(reconcileSlots([], confirmed, length)); setSelected(null); onFeedback?.("Letter arrangement reset.", "success"); }} disabled={knownCount === 0} type="button">Reset</button>
         {solved && <button className="tiny-action use-word" onClick={() => onUseGuess(slots.join(""))} type="button"><IconTarget size={15} color="currentColor" /> Try this order</button>}
       </div>
     </div>

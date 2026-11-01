@@ -45,6 +45,7 @@ export async function installServerFixture(page) {
           return this;
         },
         timeout() { return this; },
+        connect() { this.connected = true; this.receive("connect", {}); return this; },
         emitWithAck(event, data) { return new Promise(resolve => this.emit(event, data, resolve)); },
         acknowledge(event, response) {
           acknowledgements.get(event)?.(response);
@@ -52,6 +53,8 @@ export async function installServerFixture(page) {
         },
         listening(event) { return Boolean(listeners.get(event)?.size); },
         receive(event, data) {
+          if (event === "connect") this.connected = true;
+          if (event === "disconnect") this.connected = false;
           [...(listeners.get(event) || [])].forEach(handler => handler(data));
         },
       };

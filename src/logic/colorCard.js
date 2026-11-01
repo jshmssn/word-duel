@@ -40,3 +40,13 @@ export function scoreFeedback(accuracy) {
   if (accuracy >= 10) return "The target called. It wants to know who this stranger is.";
   return "A raccoon with a paint roller remembers a different color, too.";
 }
+
+export function podiumPlayers(players, scoreKey = "accuracy") {
+  const ranked = players.filter((player) => Number.isFinite(player[scoreKey]))
+    .slice().sort((first, second) => second[scoreKey] - first[scoreKey]);
+  return ranked.slice(0, 3).map((player, index) => ({
+    ...player,
+    podiumRank: ranked.findIndex((candidate) => candidate[scoreKey] === player[scoreKey]) + 1,
+    tied: ranked.some((candidate, otherIndex) => otherIndex !== index && candidate[scoreKey] === player[scoreKey]),
+  }));
+}

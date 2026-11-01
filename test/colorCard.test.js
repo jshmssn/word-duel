@@ -1,6 +1,21 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { hsvToHex, hexToHsv, cardInk, scoreFeedback } from "../src/logic/colorCard.js";
+import { hsvToHex, hexToHsv, cardInk, scoreFeedback, podiumPlayers } from "../src/logic/colorCard.js";
+
+test("podium ranks the top three accurate submissions, preserves ties, and excludes missing scores", () => {
+  const players = [{ id: "low", accuracy: 0 }, { id: "missing", accuracy: null }, { id: "silver", accuracy: 80 }, { id: "gold", accuracy: 99 }, { id: "joint-gold", accuracy: 99 }];
+  const podium = podiumPlayers(players);
+  assert.deepEqual(podium.map((player) => player.id), ["gold", "joint-gold", "silver"]);
+  assert.deepEqual(podium.map((player) => player.podiumRank), [1, 1, 3]);
+  assert.deepEqual(podium.map((player) => player.tied), [true, true, false]);
+  assert.equal(players[0].id, "low");
+});
+
+test("the final podium uses match averages and supports rooms with fewer than three players", () => {
+  const players = [{ id: "a", accuracy: 100, averageAccuracy: 50 }, { id: "b", accuracy: 10, averageAccuracy: 95 }];
+  assert.deepEqual(podiumPlayers(players, "averageAccuracy").map((player) => player.id), ["b", "a"]);
+  assert.deepEqual(podiumPlayers([]), []);
+});
 
 test("HSV picker converts primary hues, saturation, and brightness to HEX", () => {
   assert.equal(hsvToHex({ h: 0, s: 100, v: 100 }), "#FF0000");

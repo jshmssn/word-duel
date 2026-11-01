@@ -26,6 +26,7 @@ export async function installServerFixture(page) {
     contentType: "application/javascript",
     body: `
       const listeners = new Map();
+      const acknowledgements = new Map();
       const socket = {
         id: "mobile-player", connected: true, sent: [],
         on(event, handler) {
@@ -38,7 +39,17 @@ export async function installServerFixture(page) {
           else listeners.delete(event);
           return this;
         },
-        emit(event, data) { this.sent.push({ event, data }); return this; },
+        emit(event, data, reply) {
+          this.sent.push({ event, data });
+          if (reply) acknowledgements.set(event, reply);
+          return this;
+        },
+        timeout() { return this; },
+        emitWithAck(event, data) { return new Promise(resolve => this.emit(event, data, resolve)); },
+        acknowledge(event, response) {
+          acknowledgements.get(event)?.(response);
+          acknowledgements.delete(event);
+        },
         listening(event) { return Boolean(listeners.get(event)?.size); },
         receive(event, data) {
           [...(listeners.get(event) || [])].forEach(handler => handler(data));

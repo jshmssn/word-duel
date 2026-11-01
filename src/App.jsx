@@ -6,6 +6,7 @@ import { ExperienceShell, ConfettiBurst, ProgressBar, RulesDialog, SectionHeadin
 import LetterWorkbench from "./components/LetterWorkbench.jsx";
 import FloatingChat from "./components/FloatingChat.jsx";
 import ModalOverlay from "./components/ModalOverlay.jsx";
+import { ColorCardGameView, ColorCardResultsView } from "./components/ColorCard.jsx";
 import {
   IconSword,
   IconShield,
@@ -138,18 +139,29 @@ function GameLogPanel({ log = [], emptyContent, className = "" }) {
   );
 }
 
+function ColorCardSettings({ duration, count, onDurationChange, onCountChange }) {
+  return <div className="room-settings-grid">
+    <label className="setting-field"><span className="field-label">TIME TO ANSWER EACH CARD</span><select className="fun-input timer-select" value={duration} onChange={(event) => onDurationChange(Number(event.target.value))}><option value={30}>30 seconds</option><option value={45}>45 seconds</option><option value={60}>1 minute</option></select></label>
+    <label className="setting-field"><span className="field-label">NUMBER OF COLOR CARDS</span><select className="fun-input timer-select" value={count} onChange={(event) => onCountChange(Number(event.target.value))}>{Array.from({ length: 100 }, (_, index) => index + 1).map((value) => <option key={value} value={value}>{value} card{value === 1 ? "" : "s"}</option>)}</select></label>
+  </div>;
+}
+
 function LobbyScreen({ onCreated, onJoined, connected }) {
   const [username, setUsername] = useState("");
   const [joinCode, setJoinCode] = useState("");
   const [tab, setTab] = useState("create");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [gameMode, setGameMode] = useState("word-duel");
+  const [maxPlayers, setMaxPlayers] = useState(2);
+  const [colorDuration, setColorDuration] = useState(30);
+  const [colorCardCount, setColorCardCount] = useState(5);
 
   useEffect(() => {
     const sock = getSocket();
-    sock.on("room-created", ({ code, turnDuration, roundLimit, creatorId, players, mode }) => {
+    sock.on("room-created", ({ code, turnDuration, roundLimit, creatorId, players, mode, gameMode, maxPlayers, colorDuration, colorCardCount }) => {
       setLoading(false);
-      onCreated(code, username.trim(), turnDuration, creatorId, players, roundLimit, mode);
+      onCreated(code, username.trim(), turnDuration, creatorId, players, roundLimit, mode, gameMode, maxPlayers, colorDuration, colorCardCount);
     });
     sock.on("room-joined", (details) => {
       setLoading(false);
@@ -174,8 +186,11 @@ function LobbyScreen({ onCreated, onJoined, connected }) {
     }
     setError("");
     setLoading(true);
-    getSocket().emit("create-room", {
+    getSocket().emit("CREATE_ROOM", {
       username: username.trim(),
+      gameMode,
+      maxPlayers,
+      ...(gameMode === "color-card" ? { colorDuration, colorCardCount } : {}),
     });
   };
 
@@ -216,8 +231,8 @@ function LobbyScreen({ onCreated, onJoined, connected }) {
         <section className="hero-panel">
           <div className="hero-eyebrow"><span className="eyebrow-line" /> THE REAL-TIME WORD ARENA <span className="eyebrow-spark">✦</span></div>
           <h1 className="hero-headline">WORDS ARE<br /><span>YOUR WEAPON.</span></h1>
-          <p className="hero-description">Two players. Two secret words. One chance to outthink your opponent. Ask smart, connect the clues, and claim the win.</p>
-          <div className="hero-tags"><span><IconLightning size={15} color="currentColor" /> LIVE 1V1 DUELS</span><span><IconTarget size={15} color="currentColor" /> SOLO PRACTICE</span><span><IconTrophy size={15} color="currentColor" /> BEST OF 3 OR 5</span></div>
+          <p className="hero-description">Choose your challenge. Decode secret words in Word Duel or mix the closest match in Color Card with up to eight players.</p>
+          <div className="hero-tags"><span><IconLightning size={15} color="currentColor" /> 2–8 PLAYER ROOMS</span><span><IconTarget size={15} color="currentColor" /> SOLO PRACTICE</span><span><IconTrophy size={15} color="currentColor" /> BEST OF 3 OR 5</span></div>
           <div className="arena-preview" aria-label="A sample letter puzzle">
             <div className="preview-top"><span className="preview-pill"><span className="connection-dot" /> ROUND IN PROGRESS</span><span className="preview-subtitle">YOUR CLUE BOARD <span aria-hidden="true">↗</span></span></div>
             <div className="preview-matchup"><div className="preview-player"><span className="preview-avatar preview-you">Y</span><span>YOU <small>DETECTIVE</small></span></div><div className="preview-versus">VS</div><div className="preview-player right"><span>RIVAL <small>WORD KEEPER</small></span><span className="preview-avatar preview-rival">R</span></div></div>
@@ -230,7 +245,7 @@ function LobbyScreen({ onCreated, onJoined, connected }) {
         <section className="lobby-entry">
           <div className="entry-top"><span className="eyebrow"><IconSword size={16} color="currentColor" /> YOUR NEXT CHALLENGE</span><span className="entry-orbit">✳</span></div>
           <h2>Enter the <span>arena.</span></h2>
-          <p className="entry-desc">Choose a name and start your next word battle.</p>
+          <p className="entry-desc">Choose a name, pick a game, and invite your friends.</p>
           <div className="entry-form">
             <label className="field-group" htmlFor="player-username"><span className="field-label">PLAYER NAME <span>01 / 02</span></span>
               <input id="player-username" autoComplete="nickname" className="fun-input" value={username} onChange={(e) => { setUsername(e.target.value); setError(""); }} onKeyDown={(e) => { if (e.key === "Enter") tab === "create" ? handleCreate() : handleJoin(); }} placeholder="What should we call you?" maxLength={16} />
@@ -239,10 +254,15 @@ function LobbyScreen({ onCreated, onJoined, connected }) {
               <button type="button" role="tab" aria-selected={tab === "create"} className={`tab-pill ${tab === "create" ? "active" : ""}`} onClick={() => {setTab("create"); setError("");}}><IconHome size={17} color="currentColor" /> Create room</button>
               <button type="button" role="tab" aria-selected={tab === "join"} className={`tab-pill ${tab === "join" ? "active" : ""}`} onClick={() => {setTab("join"); setError("");}}><IconRocket size={17} color="currentColor" /> Join room</button>
             </div>
+            {tab === "create" && <div className="create-room-settings">
+              <label className="field-group" htmlFor="room-game-mode"><span className="field-label">GAME MODE</span><select id="room-game-mode" className="fun-input timer-select" value={gameMode} onChange={(event) => setGameMode(event.target.value)}><option value="word-duel">Word Duel</option><option value="color-card">Color Card</option></select></label>
+              <label className="field-group" htmlFor="room-max-players"><span className="field-label">MAX NUMBER OF PLAYERS</span><select id="room-max-players" className="fun-input timer-select" value={maxPlayers} onChange={(event) => setMaxPlayers(Number(event.target.value))}>{Array.from({ length: 7 }, (_, index) => index + 2).map((count) => <option key={count} value={count}>{count} players</option>)}</select></label>
+              {gameMode === "color-card" && <ColorCardSettings duration={colorDuration} count={colorCardCount} onDurationChange={setColorDuration} onCountChange={setColorCardCount} />}
+            </div>}
             {tab === "join" && <label className="field-group enter-from-right" htmlFor="room-join-code"><span className="field-label">8-CHARACTER ROOM CODE</span><input id="room-join-code" autoCapitalize="characters" autoCorrect="off" spellCheck={false} enterKeyHint="go" className="fun-input code-input-fun" value={joinCode} onChange={(e) => { setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")); setError(""); }} onKeyDown={(e) => e.key === "Enter" && handleJoin()} placeholder="ENTER CODE" maxLength={8} /></label>}
             {error && <div className="error-bubble" role="alert"><IconWarning size={16} color="currentColor" /> {error}</div>}
             {!connected && !error && <div className="connection-notice" role="status">Connecting to game server…</div>}
-            {tab === "create" ? <div className="create-actions"><button className="btn-fun btn-fun-yellow" onClick={handleCreate} disabled={loading || !connected}><span className="btn-icon-row"><IconLightning size={19} color="currentColor" /> {loading ? "Opening arena…" : "Create a duel"} <span className="action-arrow">↗</span></span></button><button className="btn-fun btn-fun-ghost" onClick={handleCreateBotRoom} disabled={loading || !connected}><span className="btn-icon-row"><IconTarget size={19} color="currentColor" /> Practice vs bot <span className="action-arrow">→</span></span></button></div> : <button className="btn-fun btn-fun-yellow" onClick={handleJoin} disabled={loading || !connected}><span className="btn-icon-row"><IconRocket size={18} color="currentColor" /> {loading ? "Finding room…" : "Join the duel"} <span className="action-arrow">↗</span></span></button>}
+            {tab === "create" ? <div className="create-actions"><button className="btn-fun btn-fun-yellow" onClick={handleCreate} disabled={loading || !connected}><span className="btn-icon-row"><IconLightning size={19} color="currentColor" /> {loading ? "Opening arena…" : gameMode === "word-duel" ? "Create a duel" : "Create Color Card room"} <span className="action-arrow">↗</span></span></button>{gameMode === "word-duel" && <button className="btn-fun btn-fun-ghost" onClick={handleCreateBotRoom} disabled={loading || !connected}><span className="btn-icon-row"><IconTarget size={19} color="currentColor" /> Practice vs bot (2 players) <span className="action-arrow">→</span></span></button>}</div> : <button className="btn-fun btn-fun-yellow" onClick={handleJoin} disabled={loading || !connected}><span className="btn-icon-row"><IconRocket size={18} color="currentColor" /> {loading ? "Finding room…" : "Join room"} <span className="action-arrow">↗</span></span></button>}
           </div>
           <div className="entry-bottom"><span className="entry-star">✦</span><div><strong>THINK QUICK. SPELL FASTER.</strong><p>No sign-up required. Invite a friend or face a bot.</p></div></div>
         </section>
@@ -263,6 +283,12 @@ function WaitingScreen({
   onGameStart,
   turnDuration,
   roundLimit,
+  gameMode,
+  maxPlayers,
+  colorDuration,
+  onColorDurationChange,
+  colorCardCount,
+  onColorCardCountChange,
   isCreator,
   onTurnDurationChange,
   onRoundLimitChange,
@@ -365,14 +391,15 @@ function WaitingScreen({
     };
   }, [onGameStart]);
 
-  const hasTwoPlayers = players.length === 2;
+  const hasTwoPlayers = players.length >= 2;
+  const isColorCard = gameMode === "color-card";
 
   return (
     <div className="screen waiting-screen">
       <div className="waiting-layout-container">
-        <div className="page-intro waiting-intro"><div><span className="eyebrow"><IconShield size={16} color="currentColor" /> PRIVATE DUEL LOBBY</span><h1>Prepare for <span>battle.</span></h1><p>Invite your opponent, get ready, and let the words fly.</p></div><div className="lobby-state-chip"><span className="pulse-dot" /> {hasTwoPlayers ? "PLAYERS ASSEMBLED" : "WAITING FOR CHALLENGER"}</div></div>
+        <div className="page-intro waiting-intro"><div><span className="eyebrow"><IconShield size={16} color="currentColor" /> {isColorCard ? "COLOR CARD" : "WORD DUEL"} LOBBY</span><h1>Prepare to <span>play.</span></h1><p>{isColorCard ? `${colorCardCount} unique shared color${colorCardCount === 1 ? "" : "s"}. Memorize each for 5 seconds, then recreate it in ${colorDuration} seconds. The server moves everyone through results and rankings together.` : "Investigate the next player’s secret word in lobby order. Turns rotate through everyone."}</p></div><div className="lobby-state-chip"><span className="pulse-dot" /> {hasTwoPlayers ? "PLAYERS ASSEMBLED" : "WAITING FOR CHALLENGER"}</div></div>
         <div className="ready-journey" aria-label="Match preparation progress">
-          <div className="journey-step done"><span>01</span> ROOM CREATED</div><div className={`journey-line ${hasTwoPlayers ? "done" : ""}`} /><div className={`journey-step ${hasTwoPlayers ? "done" : ""}`}><span>02</span> PLAYERS JOINED</div><div className={`journey-line ${players.every(p=>p.ready) && hasTwoPlayers ? "done" : ""}`} /><div className={`journey-step ${players.every(p=>p.ready) && hasTwoPlayers ? "done" : ""}`}><span>03</span> BOTH READY</div>
+          <div className="journey-step done"><span>01</span> ROOM CREATED</div><div className={`journey-line ${hasTwoPlayers ? "done" : ""}`} /><div className={`journey-step ${hasTwoPlayers ? "done" : ""}`}><span>02</span> PLAYERS JOINED</div><div className={`journey-line ${players.every(p=>p.ready) && hasTwoPlayers ? "done" : ""}`} /><div className={`journey-step ${players.every(p=>p.ready) && hasTwoPlayers ? "done" : ""}`}><span>03</span> ALL READY</div>
         </div>
         <div className="waiting-grid">
           <div className="waiting-main">
@@ -382,30 +409,31 @@ function WaitingScreen({
               <span className="copy-hint">{copied ? <><IconCheck size={15} color="currentColor" /> Copied to clipboard!</> : <><IconCopy size={15} color="currentColor" /> Click to copy & share <span>↗</span></>}</span>
             </button>
             <div className="player-panel">
-              <SectionHeading kicker="HEAD TO HEAD" title="Player lineup" right={<span className="player-capacity">{players.length} / 2 PLAYERS</span>} />
+              <SectionHeading kicker="YOUR ROOM" title="Player lineup" right={<span className="player-capacity">{players.length} / {maxPlayers} PLAYERS</span>} />
               <div className="player-slots">
-                {[0, 1].map((i) => { const p = players[i]; const [c1, c2] = avatarGrad(i); return <div key={i} className={`player-card ${p ? "filled" : "empty"} ${p?.ready ? "ready-yes" : ""}`}>
+                {Array.from({ length: maxPlayers }, (_, index) => index).map((i) => { const p = players[i]; const [c1, c2] = avatarGrad(i); return <div key={i} className={`player-card ${p ? "filled" : "empty"} ${p?.ready ? "ready-yes" : ""}`}>
                   <div className="player-avatar-fun" style={p ? { background: `linear-gradient(135deg,${c1},${c2})` } : {}}>{p ? p.username[0].toUpperCase() : "?"}</div>
                   <div className="player-ident"><div className="player-name-fun"><span className="player-display-name">{p ? p.username : "Awaiting challenger"}</span>{p?.id === myId && <span className="you-tag">YOU</span>}{p?.isBot && <span className="you-tag">BOT</span>}</div><div className="player-meta-row">{p ? <span><IconTrophy size={13} color="currentColor" /> {p.wins || 0} WINS</span> : <span>SHARE YOUR INVITE CODE ABOVE</span>}</div></div>
                   {p ? <span className={`ready-pill ${p.ready ? "yes" : "no"}`}>{p.ready ? <><IconCheck size={13} color="currentColor" /> READY</> : "NOT READY"}</span> : <span className="empty-player-pulse"><span className="pulse-dot" /></span>}
                 </div>; })}
               </div>
-              <ProgressBar value={players.filter((p)=>p.ready).length} max={2} label="Players ready" color="mint" />
-              {hasTwoPlayers ? <button className={`btn-ready-fun ${imReady ? "is-ready" : "not-ready"}`} onClick={handleReady}><IconShield size={21} color="currentColor" /> {imReady ? "You're ready — tap to cancel" : "I'm ready to battle"} <span className="action-arrow">↗</span></button> : <div className="invite-nudge"><span className="pulse-dot" /> Invite someone to join the duel — or start a new bot match.</div>}
-              {hasTwoPlayers && !players.every((p)=>p.ready) && countdown === null && <div className="ready-caption">Both players must hit ready to start the match.</div>}
+              <ProgressBar value={players.filter((p)=>p.ready).length} max={Math.max(2, players.length)} label="Players ready" color="mint" />
+              {hasTwoPlayers ? <button className={`btn-ready-fun ${imReady ? "is-ready" : "not-ready"}`} onClick={handleReady}><IconShield size={21} color="currentColor" /> {imReady ? "You're ready — tap to cancel" : "I'm ready to battle"} <span className="action-arrow">↗</span></button> : <div className="invite-nudge"><span className="pulse-dot" /> Invite someone to join your room.</div>}
+              {hasTwoPlayers && !players.every((p)=>p.ready) && countdown === null && <div className="ready-caption">All joined players must hit ready to start. At least two players are required.</div>}
             </div>
           </div>
           <aside className="waiting-side">
             <div className="room-settings-panel">
               <SectionHeading kicker="MATCH CONFIGURATION" title="Room settings" right={<IconLightning size={18} color="var(--cyan)" />} />
-              {isCreator ? <div className="room-settings-grid"><label className="setting-field"><span className="field-label">TURN TIMER</span><select className="fun-input timer-select" value={turnDuration} onChange={handleTimerChange}><option value={0}>Unlimited</option><option value={30}>30 seconds</option><option value={45}>45 seconds</option><option value={60}>60 seconds</option></select></label><label className="setting-field"><span className="field-label">MATCH FORMAT</span><select className="fun-input timer-select" value={roundLimit} onChange={handleRoundLimitChange}><option value={1}>Single round</option><option value={3}>Best of 3</option><option value={5}>Best of 5</option></select></label></div> : <div className="room-settings-overview"><div><span>TURN TIMER</span><strong>{turnDuration ? `${turnDuration} seconds` : "Unlimited"}</strong></div><div><span>MATCH FORMAT</span><strong>{roundLimit === 1 ? "Single round" : `Best of ${roundLimit}`}</strong></div><small>The room creator controls these settings.</small></div>}
+              <div className="room-mode-summary"><span>{isColorCard ? "Color Card" : "Word Duel"}</span><span>Up to {maxPlayers} players</span></div>
+              {isColorCard ? <div className="room-settings-overview"><div><span>MEMORIZE</span><strong>5 seconds per card</strong></div>{isCreator ? <ColorCardSettings duration={colorDuration} count={colorCardCount} onDurationChange={onColorDurationChange} onCountChange={onColorCardCountChange} /> : <><div><span>TIME TO ANSWER EACH CARD</span><strong>{colorDuration === 60 ? "1 minute" : `${colorDuration} seconds`}</strong></div><div><span>NUMBER OF COLOR CARDS</span><strong>{colorCardCount}</strong></div></>}<div><span>SCORING</span><strong>Highest average accuracy wins</strong></div></div> : isCreator ? <div className="room-settings-grid"><label className="setting-field"><span className="field-label">TURN TIMER</span><select className="fun-input timer-select" value={turnDuration} onChange={handleTimerChange}><option value={0}>Unlimited</option><option value={30}>30 seconds</option><option value={45}>45 seconds</option><option value={60}>60 seconds</option></select></label><label className="setting-field"><span className="field-label">MATCH FORMAT</span><select className="fun-input timer-select" value={roundLimit} onChange={handleRoundLimitChange}><option value={1}>Single round</option><option value={3}>Best of 3</option><option value={5}>Best of 5</option></select></label></div> : <div className="room-settings-overview"><div><span>TURN TIMER</span><strong>{turnDuration ? `${turnDuration} seconds` : "Unlimited"}</strong></div><div><span>MATCH FORMAT</span><strong>{roundLimit === 1 ? "Single round" : `Best of ${roundLimit}`}</strong></div><small>The room creator controls these settings.</small></div>}
               <div className="settings-note"><IconShield size={15} color="currentColor" /> Fair play is the only rule that matters.</div>
             </div>
             <div className="waiting-log-section"><SectionHeading kicker="WHAT'S HAPPENING" title="Live activity" /><GameLogPanel log={gameLogs} className="waiting-room-log" emptyContent={<div className="log-row info"><span className="log-icon"><IconHourglass size={15} color="currentColor" /></span> Activity will show up here.</div>} /></div>
           </aside>
         </div>
       </div>
-      {countdown !== null && <ModalOverlay className="countdown-overlay" role="status"><div className="countdown-card"><span className="eyebrow">GET READY</span><div className="countdown-num" key={countdown}>{countdown}</div><div className="countdown-label-fun"><IconLightning size={19} color="currentColor" /> DUEL STARTING</div></div></ModalOverlay>}
+      {countdown !== null && <ModalOverlay className="countdown-overlay" role="status"><div className="countdown-card"><span className="eyebrow">GET READY</span><div className="countdown-num" key={countdown}>{countdown}</div><div className="countdown-label-fun"><IconLightning size={19} color="currentColor" /> {isColorCard ? "COLOR CARD STARTING" : "DUEL STARTING"}</div></div></ModalOverlay>}
       {showSlotMachine && selectedCategory && <SlotMachine selectedCategoryName={selectedCategory} onDone={handleSlotMachineDone} />}
       <FloatingChat messages={chatMessages} onSend={onChat} myId={myId} isOpen={chatOpen} onToggle={handleChatToggle} unread={unread} />
     </div>
@@ -469,7 +497,8 @@ function GameScreen({
   const initialTurnSoundPlayed = useRef(false);
 
   const isMyTurn = turn === myId;
-  const opponent = players.find((p) => p.id !== myId);
+  const opponent = players.find((p) => p.id === gameState.opponentId) || players.find((p) => p.id !== myId);
+  const currentPlayer = players.find((p) => p.id === turn);
 
   const addLog = useCallback(
     (entry) => setGameLogs((prev) => [...prev, entry]),
@@ -590,7 +619,7 @@ function GameScreen({
         addLog({
           type: "info",
           icon: <IconReturnArrow size={14} color="currentColor" />,
-          text: `${opponent?.username}'s turn...`,
+          text: `${players.find((player) => player.id === ct)?.username || "Opponent"}'s turn...`,
         });
       }
     });
@@ -603,7 +632,7 @@ function GameScreen({
         text:
           playerId === myId
             ? "You ran out of time!"
-            : `${opponent?.username} ran out of time!`,
+            : `${players.find((player) => player.id === playerId)?.username || "Opponent"} ran out of time!`,
       });
     });
 
@@ -715,7 +744,7 @@ function GameScreen({
         <div className="page-intro game-intro"><div><span className="eyebrow"><IconSword size={16} color="currentColor" /> HEAD-TO-HEAD WORD BATTLE</span><h1>The <span>duel is on.</span></h1></div><div className="match-chip"><span className="pulse-dot" /> ROUND {gameState.roundNumber || 1} {gameState.roundLimit > 1 ? `/ ${gameState.roundLimit}` : ""}</div></div>
         <div className="turn-banner-fun">
           <div className="category-tag"><span className="category-symbol"><IconDice size={18} color="currentColor" /></span><div><small>YOUR CATEGORY</small><strong>{category}</strong></div></div>
-          <div className={`turn-badge ${isMyTurn ? "your-turn" : "their-turn"}`}>{isMyTurn ? <><IconLightning size={20} color="currentColor" /> YOUR TURN — MAKE IT COUNT!</> : <><span className="pulse-dot" /> {opponent?.username || "Opponent"} IS THINKING</>}</div>
+          <div className={`turn-badge ${isMyTurn ? "your-turn" : "their-turn"}`}>{isMyTurn ? <><IconLightning size={20} color="currentColor" /> YOUR TURN — MAKE IT COUNT!</> : <><span className="pulse-dot" /> {currentPlayer?.username || "Opponent"} IS THINKING</>}</div>
         </div>
         {timerTotal > 0 && <TurnTimer remaining={timerRemaining} total={timerTotal} isMyTurn={isMyTurn} />}
         {opponentLeft && <div className="disconnect-banner"><span className="inline-icon-row"><IconWarning size={18} color="currentColor" /> Opponent disconnected.</span><button className="btn-fun btn-fun-ghost" onClick={onReturnToWaiting}>Back to room</button></div>}
@@ -849,6 +878,7 @@ function GameScreen({
             <div className="word-panels">
               <div className="word-card my-card"><div className="word-card-title"><IconShield size={17} color="var(--mint)" /> YOUR SECRET WORD <span className="secret-pill">TOP SECRET</span></div><div className="my-word-text">{myWord.toUpperCase()}</div><div className="secret-bottom">{myWordLetterCount} LETTERS <span>·</span> DON'T GIVE IT AWAY</div></div>
               <div className="word-card opp-card"><div className="word-card-title"><IconTarget size={17} color="var(--cyan)" /> CRACK THEIR WORD <span className="target-length">{opponentLetterCount} LETTERS</span></div>
+                {players.length > 2 && <p className="word-target-name">Investigating {opponent?.username}’s word</p>}
                 <LetterWorkbench confirmed={confirmedLetters} length={opponentLetterCount} onUseGuess={(word) => { setGuessInput(word); setActiveTab("guess"); }} />
                 {reward && <div className="reward-pop" key={reward.id}>{reward.message} <span>✦</span></div>}
               </div>
@@ -859,7 +889,7 @@ function GameScreen({
           {!isMyTurn && (
             <div className="waiting-msg">
               <span className="pulse-dot" />
-              Waiting for {opponent?.username || "opponent"}...
+              Waiting for {currentPlayer?.username || "opponent"}...
             </div>
           )}
           {isMyTurn && !waitingFor && (
@@ -1010,7 +1040,7 @@ function GameScreen({
           </div>
           <aside className="game-sidebar">
             <div className="intel-panel"><div className="side-kicker">MATCH INTELLIGENCE <span>✦</span></div><h3>Every clue counts.</h3><p>Find the letters and build your own guess in the workbench.</p><div className="intel-stats"><div><strong>{confirmedLetters.length}</strong><small>LETTERS FOUND</small></div><div><strong>{Object.keys(askedLetters).length}</strong><small>LETTERS ASKED</small></div><div><strong>{opponentLetterCount}</strong><small>WORD LENGTH</small></div></div><ProgressBar value={confirmedLetters.length} max={opponentLetterCount} color="mint" label="Discovery progress" /></div>
-            <div className="feed-panel"><SectionHeading kicker="THE MATCH SO FAR" title="Live activity" right={<IconChat size={17} color="var(--muted)" />} /><GameLogPanel log={gameLogs} emptyContent={<div className="log-row info"><span className="log-icon"><IconHourglass size={14} color="currentColor" /></span>{isMyTurn ? "Your move. Ask or guess!" : `${opponent?.username} goes first.`}</div>} /></div>
+            <div className="feed-panel"><SectionHeading kicker="THE MATCH SO FAR" title="Live activity" right={<IconChat size={17} color="var(--muted)" />} /><GameLogPanel log={gameLogs} emptyContent={<div className="log-row info"><span className="log-icon"><IconHourglass size={14} color="currentColor" /></span>{isMyTurn ? "Your move. Ask or guess!" : `${currentPlayer?.username} goes first.`}</div>} /></div>
             <div className="tip-panel"><span className="tip-icon"><IconBulb size={18} color="currentColor" /></span><div><strong>PRO TIP</strong><p>Known letters reveal what exists, <em>not where it goes.</em> Rearrange the tiles to test your theory.</p></div></div>
           </aside>
         </div>
@@ -1084,7 +1114,7 @@ function AnimatedRevealWord({ label, word, variant, delay = 0 }) {
 function GameOverScreen({ result, myId, onRematch, chatMessages, onChat }) {
   const isWinner = result.winnerId === myId;
   const resultPlayers = Array.isArray(result.players) ? result.players : [];
-  const opponent = resultPlayers.find((player) => player.id !== myId);
+  const opponent = resultPlayers.find((player) => player.id === result.opponentsByPlayer?.[myId]) || resultPlayers.find((player) => player.id !== myId);
   const myResultWord =
     result.wordsByPlayer?.[myId] || result.loserWord || result.correctWord || "";
   const opponentResultWord =
@@ -1259,6 +1289,10 @@ export default function App() {
   const [turnDuration, setTurnDuration] = useState(0);
   const [roundLimit, setRoundLimit] = useState(1);
   const [roomMode, setRoomMode] = useState("duel");
+  const [gameMode, setGameMode] = useState("word-duel");
+  const [maxPlayers, setMaxPlayers] = useState(2);
+  const [colorDuration, setColorDuration] = useState(30);
+  const [colorCardCount, setColorCardCount] = useState(5);
   const [creatorId, setCreatorId] = useState(null);
   const [myId, setMyId] = useState(() => getSocket().id || null);
   const [connected, setConnected] = useState(() => getSocket().connected);
@@ -1318,12 +1352,20 @@ export default function App() {
       roundLimit: rl,
       creatorId: cid,
       mode,
+      gameMode: selectedGameMode,
+      maxPlayers: capacity,
+      colorDuration: cd,
+      colorCardCount: cc,
     }) => {
       setPlayers(pl);
       if (td !== undefined) setTurnDuration(td);
       if (rl !== undefined) setRoundLimit(rl);
       if (cid !== undefined) setCreatorId(cid);
       if (mode) setRoomMode(mode);
+      if (selectedGameMode) setGameMode(selectedGameMode);
+      if (capacity !== undefined) setMaxPlayers(capacity);
+      if (cd !== undefined) setColorDuration(cd);
+      if (cc !== undefined) setColorCardCount(cc);
     };
     const handleReadyUpdate = ({ players: pl, creatorId: cid }) => {
       setPlayers(pl);
@@ -1337,11 +1379,20 @@ export default function App() {
       setRoundLimit(rl || 1);
       if (cid !== undefined) setCreatorId(cid);
     };
+    const handleColorDurationUpdated = ({ code, colorDuration: duration }) => {
+      if (code === roomCode) setColorDuration(duration);
+    };
+    const handleColorCardCountUpdated = ({ code, colorCardCount: count }) => {
+      if (code === roomCode) setColorCardCount(count);
+    };
     const handleChatHistory = ({ messages }) => setChatMessages(messages);
     const handleChatMessage = (msg) =>
       setChatMessages((prev) => [...prev, msg]);
     const handleGameStartEvent = (data) => {
-      setGameState((prev) => ({ ...data, code: roomCode || prev?.code }));
+      setGameState((prev) => ({ ...data, code: roomCode || prev?.code,
+        ...(typeof data.serverNow === "number" ? { serverClockOffset: data.serverNow - Date.now() } : {}) }));
+      setGameMode(data.gameMode || "word-duel");
+      setGameOverResult(null);
       if (data.turnDuration !== undefined) setTurnDuration(data.turnDuration);
       if (data.roundLimit !== undefined) setRoundLimit(data.roundLimit);
       setGameLogs([]);
@@ -1353,29 +1404,61 @@ export default function App() {
       turnDuration: td,
       roundLimit: rl,
       creatorId: cid,
+      gameMode: selectedGameMode,
+      maxPlayers: capacity,
+      colorDuration: cd,
+      colorCardCount: cc,
+      message,
     }) => {
       setPlayers(pl);
       if (td !== undefined) setTurnDuration(td);
       if (rl !== undefined) setRoundLimit(rl);
       if (cid !== undefined) setCreatorId(cid);
+      if (selectedGameMode) setGameMode(selectedGameMode);
+      if (capacity !== undefined) setMaxPlayers(capacity);
+      if (cd !== undefined) setColorDuration(cd);
+      if (cc !== undefined) setColorCardCount(cc);
       setGameState(null);
       setGameOverResult(null);
       setScreen("waiting");
-      addSystemChat("Rematch! Press Ready when you're set.");
+      addSystemChat(message || "Rematch! Press Ready when you're set.");
     };
-    const handlePlayerLeft = ({ username }) => {
+    const handlePlayerLeft = ({ playerId, username }) => {
       addSystemChat(`${username} left the room.`);
       if (screen === "waiting")
-        setPlayers((prev) => prev.filter((p) => p.username !== username));
+        setPlayers((prev) => prev.filter((p) => playerId ? p.id !== playerId : p.username !== username));
+    };
+    const handleSubmissionUpdate = ({ code, roundId, submittedPlayerIds }) => {
+      setGameState((prev) => prev?.code === code && prev.roundId === roundId ? { ...prev, submittedPlayerIds } : prev);
+    };
+    const handleColorPickingStarted = ({ code, roundId, phase, roundEndsAt, serverNow }) => {
+      setGameState((prev) => prev?.code === code && prev.roundId === roundId
+        ? { ...prev, phase, roundEndsAt, targetColor: null,
+          ...(typeof serverNow === "number" ? { serverClockOffset: serverNow - Date.now() } : {}) } : prev);
+    };
+    const handleRoundResults = (result) => {
+      setGameMode("color-card");
+      setGameOverResult({ ...result, ...(typeof result.serverNow === "number" ? { serverClockOffset: result.serverNow - Date.now() } : {}) });
+      setPlayers(result.players);
+      setScreen("gameover");
+      addSystemChat(result.phase === "review" ? `Card ${result.roundNumber} finished. Review your color before rankings appear.`
+        : `${result.winners.map((winner) => winner.username).join(", ")} ${result.winners.length > 1 ? "share the win" : "wins"} for card ${result.roundNumber}.`);
     };
 
     sock.on("player-joined", handlePlayerJoined);
     sock.on("ready-update", handleReadyUpdate);
     sock.on("turn-duration-update", handleTurnDurationUpdate);
     sock.on("round-limit-update", handleRoundLimitUpdate);
+    sock.on("COLOR_DURATION_UPDATED", handleColorDurationUpdated);
+    sock.on("COLOR_CARD_COUNT_UPDATED", handleColorCardCountUpdated);
     sock.on("chat-history", handleChatHistory);
     sock.on("chat-message", handleChatMessage);
     sock.on("game-start", handleGameStartEvent);
+    sock.on("START_GAME", handleGameStartEvent);
+    sock.on("SUBMISSION_UPDATE", handleSubmissionUpdate);
+    sock.on("COLOR_PICKING_STARTED", handleColorPickingStarted);
+    sock.on("ROUND_RESULTS", handleRoundResults);
+    sock.on("COLOR_RANKINGS", handleRoundResults);
     sock.on("rematch-lobby", handleRematchLobby);
     sock.on("player-left", handlePlayerLeft);
 
@@ -1384,9 +1467,16 @@ export default function App() {
       sock.off("ready-update", handleReadyUpdate);
       sock.off("turn-duration-update", handleTurnDurationUpdate);
       sock.off("round-limit-update", handleRoundLimitUpdate);
+      sock.off("COLOR_DURATION_UPDATED", handleColorDurationUpdated);
+      sock.off("COLOR_CARD_COUNT_UPDATED", handleColorCardCountUpdated);
       sock.off("chat-history", handleChatHistory);
       sock.off("chat-message", handleChatMessage);
       sock.off("game-start", handleGameStartEvent);
+      sock.off("START_GAME", handleGameStartEvent);
+      sock.off("SUBMISSION_UPDATE", handleSubmissionUpdate);
+      sock.off("COLOR_PICKING_STARTED", handleColorPickingStarted);
+      sock.off("ROUND_RESULTS", handleRoundResults);
+      sock.off("COLOR_RANKINGS", handleRoundResults);
       sock.off("rematch-lobby", handleRematchLobby);
       sock.off("player-left", handlePlayerLeft);
     };
@@ -1397,20 +1487,28 @@ export default function App() {
       setGameState((prev) => ({ ...prev, code: roomCode }));
   }, [roomCode, gameState]);
 
-  const handleRoomCreated = (code, username, td, cid, pl, rl, mode) => {
+  const handleRoomCreated = (code, username, td, cid, pl, rl, mode, selectedGameMode, capacity, cd, cc) => {
     setRoomCode(code);
     setTurnDuration(td || 0);
     setRoundLimit(rl || 1);
     setRoomMode(mode || "duel");
+    setGameMode(selectedGameMode || "word-duel");
+    setMaxPlayers(capacity || 2);
+    setColorDuration(cd || 30);
+    setColorCardCount(cc || 5);
     setCreatorId(cid || getSocket().id);
     setPlayers(pl || [{ id: getSocket().id, username, ready: false, wins: 0 }]);
     setGameLogs([]);
     setScreen("waiting");
   };
 
-  const handleRoomJoined = ({ code, players: joinedPlayers, turnDuration: td, roundLimit: rl, creatorId: cid, mode }) => {
+  const handleRoomJoined = ({ code, players: joinedPlayers, turnDuration: td, roundLimit: rl, creatorId: cid, mode, gameMode: selectedGameMode, maxPlayers: capacity, colorDuration: cd, colorCardCount: cc }) => {
     setRoomCode(code);
     setRoomMode(mode || "duel");
+    setGameMode(selectedGameMode || "word-duel");
+    setMaxPlayers(capacity || 2);
+    setColorDuration(cd || 30);
+    setColorCardCount(cc || 5);
     setPlayers(joinedPlayers || []);
     setTurnDuration(td || 0);
     setRoundLimit(rl || 1);
@@ -1438,6 +1536,8 @@ export default function App() {
   }, []);
 
   const handleRematch = () => getSocket().emit("rematch", { code: roomCode });
+  const handleColorDurationChange = (duration) => getSocket().emit("SET_COLOR_DURATION", { code: roomCode, duration });
+  const handleColorCardCountChange = (count) => getSocket().emit("SET_COLOR_CARD_COUNT", { code: roomCode, count });
 
   const handleTurnDurationChange = useCallback(
     (duration) => {
@@ -1474,13 +1574,17 @@ export default function App() {
 
   let currentView = null;
   if (screen === "lobby") currentView = <LobbyScreen onCreated={handleRoomCreated} onJoined={handleRoomJoined} connected={connected} />;
-  else if (screen === "waiting") currentView = <WaitingScreen code={roomCode} players={players} myId={myId} gameLogs={gameLogs} chatMessages={chatMessages} onChat={handleChat} onGameStart={handleGameStart} turnDuration={turnDuration} roundLimit={roundLimit} isCreator={creatorId === myId} onTurnDurationChange={handleTurnDurationChange} onRoundLimitChange={handleRoundLimitChange} />;
-  else if (screen === "game" && gameState) currentView = <GameScreen gameState={{ ...gameState, code: roomCode, turnDuration, roundLimit }} myId={myId} gameLogs={gameLogs} setGameLogs={setGameLogs} onGameOver={handleGameOver} onReturnToWaiting={handleReturnToWaiting} chatMessages={chatMessages} onChat={handleChat} onFeedback={showFeedback} />;
-  else if (screen === "gameover" && gameOverResult) currentView = <GameOverScreen result={gameOverResult} myId={myId} onRematch={handleRematch} chatMessages={chatMessages} onChat={handleChat} />;
+  else if (screen === "waiting") currentView = <WaitingScreen code={roomCode} players={players} myId={myId} gameMode={gameMode} maxPlayers={maxPlayers} colorDuration={colorDuration} onColorDurationChange={handleColorDurationChange} colorCardCount={colorCardCount} onColorCardCountChange={handleColorCardCountChange} gameLogs={gameLogs} chatMessages={chatMessages} onChat={handleChat} onGameStart={handleGameStart} turnDuration={turnDuration} roundLimit={roundLimit} isCreator={creatorId === myId} onTurnDurationChange={handleTurnDurationChange} onRoundLimitChange={handleRoundLimitChange} />;
+  else if (screen === "game" && gameState) currentView = gameMode === "color-card"
+    ? <ColorCardGameView key={gameState.roundId} gameState={gameState} socket={getSocket()} myId={myId} connected={connected} chatMessages={chatMessages} onChat={handleChat} />
+    : <GameScreen gameState={{ ...gameState, code: roomCode, turnDuration, roundLimit }} myId={myId} gameLogs={gameLogs} setGameLogs={setGameLogs} onGameOver={handleGameOver} onReturnToWaiting={handleReturnToWaiting} chatMessages={chatMessages} onChat={handleChat} onFeedback={showFeedback} />;
+  else if (screen === "gameover" && gameOverResult) currentView = gameMode === "color-card"
+    ? <ColorCardResultsView key={`${gameOverResult.roundId}:${gameOverResult.phase}`} result={gameOverResult} myId={myId} connected={connected} onRematch={handleRematch} chatMessages={chatMessages} onChat={handleChat} />
+    : <GameOverScreen result={gameOverResult} myId={myId} onRematch={handleRematch} chatMessages={chatMessages} onChat={handleChat} />;
   return (
     <ExperienceShell screen={screen} code={roomCode} connected={connected} audioEnabled={audioEnabled} onAudioToggle={toggleSound} onShowRules={() => setShowRules(true)} toast={toast}>
       {currentView}
-      {showRules && <RulesDialog onClose={() => setShowRules(false)} />}
+      {showRules && <RulesDialog gameMode={gameMode} onClose={() => setShowRules(false)} />}
     </ExperienceShell>
   );
 }

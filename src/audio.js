@@ -62,6 +62,7 @@ export const SFX = {
   confirm: () => sequence([520, 660], "triangle", 0.12, 0.085),
   correctGuess: () => sequence([785, 1047, 1319], "sine", 0.2, 0.095),
   timeout: () => playTone(260, "triangle", 0.22, 0.16),
+  wrong: () => sequence([220, 165], "sawtooth", 0.09, 0.1),
   colorMemorize: () => sequence([659, 988, 1319], "sine", 0.12, 0.13),
   colorMix: () => sequence([392, 523, 784], "triangle", 0.13, 0.08),
   colorAdjust: (channel, value) => {

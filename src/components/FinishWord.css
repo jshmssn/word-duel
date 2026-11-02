@@ -33,6 +33,9 @@
 .finish-word-party-list strong > small { color: var(--mint); font: 700 7px var(--font-mono); }
 .finish-word-party-list li > div > span { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
 .finish-word-host-tag { flex: none; font: 700 7px var(--font-mono); color: var(--yellow); }
+.finish-word-party-list li > div > .finish-word-ready-status { color: #a1aec7; font: 700 9px var(--font-mono); }
+.finish-word-party-list li > div > .finish-word-ready-status.ready { color: var(--mint); }
+.finish-word-ready-button { width: 100%; }
 .finish-word-briefing { background: linear-gradient(145deg, #263443, #18253a); }
 .finish-word-briefing .eyebrow { font-size: 8px; letter-spacing: 1px; }
 .finish-word-briefing h2 { font: 700 21px var(--font-display); margin: 10px 0 16px; letter-spacing: -.5px; }
@@ -49,7 +52,7 @@
 .finish-word-character { display: block; flex: none; }
 .finish-word-error { color: #ffafbf; font-size: 11px; line-height: 1.5; margin: 8px 0 0; }
 
-.in-game .screen.finish-word-game { display: flex; flex-direction: column; gap: 14px; max-width: 1340px; width: 100%; margin-inline: auto; padding-bottom: calc(69px + env(safe-area-inset-bottom, 0px)); }
+.in-game .screen.finish-word-game { display: flex; flex-direction: column; align-items: stretch; gap: 14px; max-width: 1340px; width: 100%; margin-inline: auto; padding-bottom: calc(69px + env(safe-area-inset-bottom, 0px)); }
 .finish-word-game-heading { display: flex; align-items: center; justify-content: space-between; flex: none; gap: 16px; }
 .finish-word-game-heading h1 { font: 700 clamp(22px, 3vw, 32px)/1.1 var(--font-display); letter-spacing: -1px; margin: 5px 0 0; }
 .finish-word-game-heading h1 > span { color: var(--mint); }
@@ -107,6 +110,8 @@
 .finish-word-entry > label { display: block; font: 600 10px var(--font-ui); color: #a7bbd0; margin-bottom: 7px; }
 .finish-word-input-row { display: flex; min-width: 0; border: 1px solid #638b91; border-radius: 12px; overflow: hidden; background: #0e1d31; }
 .finish-word-input-row:focus-within { outline: 2px solid #6ee9b97d; outline-offset: 2px; }
+.finish-word-input-row.invalid { border-color: #ff86a2; background: #3a2034; }
+.finish-word-input-row.invalid:focus-within { outline-color: #ff86a280; }
 .finish-word-input-row > input { min-width: 0; flex: 1; width: 100%; padding: 12px; border: none; background: none; border-radius: 0; box-shadow: none; color: #effcf7; font: 600 16px var(--font-mono); outline: none; }
 .finish-word-input-row > input:focus-visible { outline: none; }.finish-word-input-row > input::placeholder { color: #647e96; font-size: 12px; }.finish-word-input-row > input:disabled { opacity: .5; }
 .finish-word-input-row > button { flex: none; width: 45px; min-width: 45px; padding: 5px; border: 0; border-left: 1px solid #537d7d; border-radius: 0; background: #a2ecc8; color: #143c30; font-size: 25px; }.finish-word-input-row > button:disabled { opacity: .35; }
@@ -146,7 +151,7 @@
   .finish-word-console { padding: 9px 12px; border-radius: 14px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 8px; }.finish-word-turn-header { grid-column: 1 / -1; }.finish-word-turn-header > span { font-size: 7px; }.finish-word-turn-header > strong { font-size: 23px; }.finish-word-time-track { grid-column: 1 / -1; height: 3px; margin: 0 0 3px; }.finish-word-prefix-prompt { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr auto; gap: 0 8px; padding: 0; align-items: center; }.finish-word-prefix-prompt > span { font-size: 7px; }.finish-word-prefix-prompt > strong { margin: 0; grid-row: 1 / 3; grid-column: 2; gap: 4px; }.finish-word-prefix-prompt > strong > span { min-width: 30px; padding: 4px; font-size: 25px; border-radius: 6px; }.finish-word-prefix-prompt > p { font-size: 8px; margin: 2px 0 0; }.finish-word-chain { display: none; }.finish-word-entry { grid-column: 1 / -1; padding-top: 2px; margin: 0; }.finish-word-entry > label { display: none; }.finish-word-input-row { border-radius: 8px; }.finish-word-input-row > input { padding: 7px 9px; min-height: 36px; font-size: 16px; }.finish-word-input-row > button { min-height: 36px; width: 40px; min-width: 40px; }.finish-word-turn-status { margin-top: 4px; min-height: 0; font-size: 8px; }.finish-word-input-hint { display: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .finish-word-stage-camera, .finish-word-actor, .finish-word-actor > .finish-word-character, .finish-word-time-track > span { transition: none; }
+  .finish-word-game, .finish-word-game * { transition-property: none !important; }
 }
 /* A phone keyboard can leave a very short visual viewport. Keep the input
    accessible and shrink the stage into its own row rather than overlap it. */
@@ -157,4 +162,42 @@
   .finish-word-stage-block { gap: 0; overflow: hidden; }.finish-word-stage-viewport { min-height: 0; border-radius: 12px; }.finish-word-player-strip { display: none; }.finish-word-stage-caption { display: none; }
   .finish-word-actor { bottom: 10px; }.finish-word-actor > .finish-word-character { width: 78px; height: 98px; }.finish-word-nametag { margin-bottom: 4px; gap: 3px; }.finish-word-nametag > strong { font-size: 9px; padding: 4px 6px; }.finish-word-nametag .finish-word-hearts svg { width: 10px; height: 10px; }.finish-word-speech { bottom: calc(100% + 6px); font-size: 11px; padding: 7px 10px; }
   .finish-word-console { padding: 8px 11px; gap: 3px 8px; border-radius: 12px; }.finish-word-turn-header > strong { font-size: 22px; }.finish-word-turn-header > span { font-size: 7px; }.finish-word-time-track { margin: 0 0 2px; height: 3px; }.finish-word-prefix-prompt > strong > span { min-width: 28px; font-size: 24px; padding: 3px 4px; }.finish-word-prefix-prompt > p { margin-top: 2px; font-size: 8px; }.finish-word-entry { padding-top: 2px; }.finish-word-entry > label { display: none; }.finish-word-input-row > input { min-height: 36px; padding: 7px 9px; }.finish-word-input-row > button { min-height: 36px; width: 40px; min-width: 40px; }.finish-word-turn-status { margin-top: 4px; font-size: 8px; line-height: 1.3; }
+}
+
+/* Use the visual viewport's compact state as well as width: phone keyboards
+   often leave the CSS viewport tall while reducing the actual visible area. */
+@media (max-width: 680px) {
+  .finish-word-game .finish-word-game-heading, .finish-word-game .finish-word-player-strip { display: none; }
+  .finish-word-game .finish-word-game-layout { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(250px, 1fr) auto; gap: 9px; }
+  .finish-word-game .finish-word-stage-block { min-height: 250px; gap: 0; }
+  .finish-word-game .finish-word-stage-viewport { min-height: 250px; }
+  .finish-word-game .finish-word-actor { bottom: 16px; }
+  .finish-word-game .finish-word-actor > .finish-word-character { width: 96px; height: 120px; }
+  .finish-word-game .finish-word-prefix-prompt > span { color: #d2e8ed; font-size: 10px; letter-spacing: .5px; }
+  .finish-word-game .finish-word-prefix-prompt > strong > span { min-width: 38px; font-size: 32px; }
+  .finish-word-game .finish-word-entry > label { display: none; }
+}
+@media (max-width: 500px) {
+  .in-game .screen.finish-word-game.compact { padding: 8px 12px; overflow-y: auto; overscroll-behavior: contain; }
+  .finish-word-game.compact .finish-word-game-layout { flex: none; display: flex; flex-direction: column; gap: 8px; }
+  .finish-word-game.compact .finish-word-console { order: -1; flex: none; padding: 8px 12px; gap: 4px 8px; }
+  .finish-word-game.compact .finish-word-turn-status, .finish-word-game.compact .finish-word-prefix-prompt > p { display: none; }
+  .finish-word-game.compact .finish-word-prefix-prompt > strong { grid-row: 1; }
+  .finish-word-game.compact .finish-word-prefix-prompt > strong > span { min-width: 32px; padding: 4px; font-size: 28px; }
+  .finish-word-game.compact .finish-word-entry { padding-top: 2px; }
+  .finish-word-game.compact .finish-word-stage-block { flex: none; height: 140px; min-height: 140px; overflow: visible; }
+  .finish-word-game.compact .finish-word-stage-viewport { min-height: 140px; }
+  .finish-word-game.compact .finish-word-stage-caption { display: none; }
+  .finish-word-game.compact .finish-word-actor { bottom: 8px; width: min(300px, calc(100vw - 56px)); height: 120px; display: grid; grid-template-columns: 96px minmax(0, 1fr); grid-template-rows: 1fr auto; gap: 4px 12px; }
+  .finish-word-game.compact .finish-word-actor:not(.active) { visibility: hidden; }
+  .finish-word-game.compact .finish-word-actor > .finish-word-character { grid-column: 1; grid-row: 1 / 3; }
+  .finish-word-game.compact .finish-word-nametag { grid-column: 2; grid-row: 2; margin: 0; gap: 4px; }
+  .finish-word-game.compact .finish-word-speech { position: static; grid-column: 2; grid-row: 1; width: 100%; min-width: 0; max-width: none; padding: 6px 8px; font-size: 12px; }
+  .finish-word-game.compact .finish-word-actor-podium { left: 48px; width: 105px; }
+  .finish-word-game.compact .finish-word-active-arrow { display: none; }
+}
+@media (max-height: 500px) and (min-width: 501px) {
+  .finish-word-game .finish-word-game-layout { grid-template-columns: minmax(0, 1.1fr) minmax(245px, 1fr); grid-template-rows: auto; }
+  .finish-word-game .finish-word-stage-block, .finish-word-game .finish-word-stage-viewport { min-height: 180px; }
+  .finish-word-game .finish-word-actor > .finish-word-character { width: 78px; height: 98px; }
 }

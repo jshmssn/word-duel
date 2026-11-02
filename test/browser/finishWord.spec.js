@@ -15,7 +15,7 @@ async function start(page, overrides = {}) {
   await receive(page, "room-created", finishRoom);
   const now = await page.evaluate(() => Date.now());
   const state = { ...finishRoom, status: "PLAYING", gameId: "word-match", currentPlayerId: roster[0].id, currentTurnIndex: 0,
-    turnId: "turn-1", turnDuration: 10, turnEndsAt: now + 10000, serverNow: now, lastWord: null,
+    turnId: "turn-1", turnDuration: 15, turnEndsAt: now + 15000, serverNow: now, lastWord: null,
     requiredPrefix: "a", usedWords: [], successfulTurns: 0, hardModeAfter: 10, hardMode: false, typingText: "", history: [],
     ...overrides };
   await receive(page, "turn_start", state);
@@ -31,14 +31,15 @@ test("Finish the Word is discoverable with its own preview, room option and inst
   await page.getByRole("button", { name: "How to play", exact: true }).click();
   const rules = page.getByRole("dialog");
   await expect(rules).toContainText("Choose your character");
-  await expect(rules).toContainText("Ten seconds. One word.");
+  await expect(rules).toContainText("Fifteen seconds. One word.");
   await expect(rules).toContainText("three hearts");
 });
 
-test("lobby selection locks occupied characters, releases switched characters and enables the host start", async ({ page }) => {
+test("lobby selection locks characters and everyone must ready up before the host starts", async ({ page }) => {
   const unselected = roster.map((player) => ({ ...player, characterId: null }));
   await receive(page, "room-created", { ...finishRoom, players: unselected });
   await expect(page.getByRole("button", { name: "Start Finish the Word" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Ready up", exact: true })).toBeDisabled();
   await page.getByTestId("character-knight").click();
   expect(await page.evaluate(() => window.testSocket.sent.find((entry) => entry.event === "select_character")?.data)).toEqual({ code: room.code, characterId: "knight" });
   await page.evaluate(() => window.testSocket.acknowledge("select_character", { success: true }));
@@ -46,15 +47,90 @@ test("lobby selection locks occupied characters, releases switched characters an
   await expect(page.getByTestId("character-knight")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("character-wizard")).toBeDisabled();
   await expect(page.getByTestId("character-wizard")).toContainText(roster[1].username);
+  await expect(page.getByRole("button", { name: "Start Finish the Word" })).toBeDisabled();
+  await page.getByRole("button", { name: "Ready up", exact: true }).click();
+  expect(await page.evaluate(() => window.testSocket.sent.find((entry) => entry.event === "toggle-ready")?.data)).toEqual({ code: room.code });
+  await expect(page.getByRole("button", { name: "Updating…", exact: true })).toBeDisabled();
+  await page.evaluate(() => window.testSocket.acknowledge("toggle-ready", { success: true, ready: true }));
+  const readyRoster = roster.map((player) => ({ ...player, ready: true }));
+  await receive(page, "ready-update", { ...finishRoom, players: readyRoster, changedPlayerId: roster[0].id });
+  await expect(page.getByRole("button", { name: "Not ready", exact: true })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("button", { name: "Start Finish the Word" })).toBeEnabled();
+  await page.getByRole("button", { name: "Not ready", exact: true }).click();
+  await page.evaluate(() => window.testSocket.acknowledge("toggle-ready", { success: true, ready: false }));
+  await receive(page, "ready-update", { ...finishRoom, players: roster, changedPlayerId: roster[0].id });
+  await expect(page.getByRole("button", { name: "Start Finish the Word" })).toBeDisabled();
   await page.getByTestId("character-robot").click();
   await page.evaluate(() => window.testSocket.acknowledge("select_character", { success: true }));
   await receive(page, "character_selected", { ...finishRoom, players: [{ ...roster[0], characterId: "robot" }, roster[1]] });
   await expect(page.getByTestId("character-knight")).toBeEnabled();
   await expect(page.getByTestId("character-robot")).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Start Finish the Word" })).toBeDisabled();
+  await receive(page, "ready-update", { ...finishRoom, players: [{ ...readyRoster[0], characterId: "robot" }, readyRoster[1]] });
   await page.getByRole("button", { name: "Start Finish the Word" }).click();
   expect(await page.evaluate(() => window.testSocket.sent.filter((entry) => entry.event === "start_game").map((entry) => entry.data))).toEqual([{ code: room.code }]);
 });
+
+test("guests can ready and unready and see the other players' readiness", async ({ page }) => {
+  const guestRoom = { ...finishRoom, creatorId: roster[1].id };
+  await receive(page, "room-created", guestRoom);
+  await expect(page.getByRole("button", { name: "Start Finish the Word" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Ready up", exact: true }).click();
+  await page.evaluate(() => window.testSocket.acknowledge("toggle-ready", { success: true, ready: true }));
+  await receive(page, "ready-update", { ...guestRoom, players: [{ ...roster[0], ready: true }, roster[1]], changedPlayerId: roster[0].id });
+  await expect(page.getByRole("status").filter({ hasText: "Waiting for the host" })).toBeVisible();
+  await expect(page.locator(".finish-word-ready-status.ready")).toHaveCount(1);
+  await page.getByRole("button", { name: "Not ready", exact: true }).click();
+  await page.evaluate(() => window.testSocket.acknowledge("toggle-ready", { success: true, ready: false }));
+  await receive(page, "ready-update", guestRoom);
+  await expect(page.getByRole("button", { name: "Ready up", exact: true })).toHaveAttribute("aria-pressed", "false");
+});
+
+for (const reducedMotion of ["no-preference", "reduce"]) {
+  test(`invalid attempts allow immediate corrections with sound and respect ${reducedMotion} motion`, async ({ page }) => {
+    await page.emulateMedia({ reducedMotion });
+    const state = await start(page);
+    await page.evaluate(async () => {
+      const { SFX } = await import("/src/audio.js");
+      window.wrongSounds = 0; window.wordShakes = 0;
+      SFX.wrong = () => { window.wrongSounds++; };
+      const animate = Element.prototype.animate;
+      Element.prototype.animate = function (...args) {
+        if (this.classList.contains("finish-word-input-row")) window.wordShakes++;
+        return animate.apply(this, args);
+      };
+    });
+    const input = page.getByRole("textbox", { name: "Your word" });
+    await page.clock.fastForward(3000);
+    await input.fill("azzzz");
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      await input.press("Enter");
+      await page.evaluate(() => window.testSocket.acknowledge("submit_word", {
+        success: true, accepted: false, retryable: true, reason: "not_in_dictionary", message: "That word is not in the dictionary.",
+      }));
+      await expect(input).toBeEnabled();
+      await expect(input).toBeFocused();
+      await expect(input).toHaveValue("azzzz");
+      await expect(input).toHaveAttribute("aria-invalid", "true");
+      await expect(page.locator("#finish-word-input-error")).toContainText("Try again before time runs out.");
+      await expect.poll(() => page.evaluate(() => window.wrongSounds)).toBe(attempt);
+      await expect.poll(() => page.evaluate(() => window.wordShakes)).toBe(reducedMotion === "reduce" ? 0 : attempt);
+      await page.clock.fastForward(1000);
+    }
+    await expect(page.getByRole("timer")).toContainText("10");
+    await expect(page.getByRole("article", { name: `${roster[0].username}, 3 lives, current turn`, exact: true })).toBeVisible();
+    await input.fill("apple");
+    await expect(input).toHaveAttribute("aria-invalid", "false");
+    await input.press("Enter");
+    const submitted = await page.evaluate(() => window.testSocket.sent.filter((entry) => entry.event === "submit_word").map((entry) => entry.data));
+    expect(submitted).toEqual(["azzzz", "azzzz", "apple"].map((word) => ({ code: room.code, turnId: state.turnId, word })));
+    await page.evaluate(() => window.testSocket.acknowledge("submit_word", { success: true, accepted: true }));
+    await receive(page, "turn_start", { ...state, turnId: "turn-2", currentPlayerId: roster[1].id, currentTurnIndex: 1, lastWord: "apple", requiredPrefix: "e" });
+    await expect(input).toBeDisabled();
+    await expect(input).toHaveValue("");
+    await expect(page.locator("#finish-word-input-error")).toHaveCount(0);
+  });
+}
 
 test("active typing broadcasts, word submission is bound to the turn, and the camera follows the next player", async ({ page }) => {
   const state = await start(page);
@@ -81,6 +157,48 @@ test("active typing broadcasts, word submission is bound to the turn, and the ca
   await expect(page.getByTestId("live-word-bubble")).toContainText("Elephant");
 });
 
+test("pasted whitespace is removed from the draft, live typing and submitted word", async ({ page }) => {
+  const state = await start(page);
+  const input = page.getByRole("textbox", { name: "Your word" });
+  await input.fill(" A p p\u00a0l e ");
+  await expect(input).toHaveValue("Apple");
+  await page.clock.fastForward(60);
+  expect(await page.evaluate(() => window.testSocket.sent.filter((entry) => entry.event === "player_typing").at(-1)?.data.text)).toBe("Apple");
+  await input.press("Enter");
+  expect(await page.evaluate(() => window.testSocket.sent.find((entry) => entry.event === "submit_word")?.data)).toEqual({ code: room.code, turnId: state.turnId, word: "Apple" });
+});
+
+test("opening a phone keyboard keeps the prefix visible and the active character at the same size", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const state = await start(page, { currentPlayerId: roster[1].id, currentTurnIndex: 1, requiredPrefix: "le", hardMode: true });
+  await page.clock.fastForward(5000);
+  const character = page.locator(".finish-word-actor.active > .finish-word-character");
+  const before = await character.boundingBox();
+  await page.evaluate(() => {
+    Object.defineProperty(window.visualViewport, "height", { configurable: true, get: () => 380 });
+    window.visualViewport.dispatchEvent(new Event("resize"));
+  });
+  await receive(page, "turn_start", { ...state, currentPlayerId: roster[0].id, currentTurnIndex: 0, turnId: "my-turn" });
+  const input = page.getByRole("textbox", { name: "Your word" });
+  await input.fill("lemon");
+  await page.clock.fastForward(1000);
+  await expect(page.locator(".finish-word-game")).toHaveClass(/compact/);
+  await expect(page.getByTestId("required-prefix")).toHaveText("LE");
+  expect((await character.boundingBox()).height).toBeCloseTo(before.height, 0);
+  expect(await page.getByTestId("finish-word-camera").getAttribute("style")).not.toContain("scale");
+  for (const locator of [page.getByTestId("required-prefix"), input, character, page.getByTestId("live-word-bubble")]) {
+    const frame = await locator.boundingBox();
+    expect(frame.y).toBeGreaterThanOrEqual(0);
+    expect(frame.y + frame.height).toBeLessThanOrEqual(380);
+    expect(frame.x).toBeGreaterThanOrEqual(0);
+    expect(frame.x + frame.width).toBeLessThanOrEqual(390);
+  }
+  const arena = await page.getByTestId("finish-word-stage").boundingBox();
+  const controls = await page.getByLabel("Word controls").boundingBox();
+  expect(controls.y + controls.height).toBeLessThanOrEqual(arena.y);
+  await page.screenshot({ path: "test-results/finish-word-mobile-keyboard.png", animations: "disabled" });
+});
+
 test("hard mode, heart loss, elimination, results and rematch use authoritative snapshots", async ({ page }) => {
   const state = await start(page, { requiredPrefix: "le", hardMode: true, successfulTurns: 10, lastWord: "apple" });
   await expect(page.getByTestId("required-prefix")).toHaveText("LE");
@@ -98,7 +216,8 @@ test("hard mode, heart loss, elimination, results and rematch use authoritative 
   await page.getByRole("button", { name: /Back to character lobby/ }).click();
   expect(await page.evaluate(() => window.testSocket.sent.some((entry) => entry.event === "rematch"))).toBe(true);
   await receive(page, "rematch-lobby", finishRoom);
-  await expect(page.getByRole("button", { name: "Start Finish the Word" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Start Finish the Word" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Ready up", exact: true })).toBeEnabled();
 });
 
 test("restoration keeps the active word and a paused clock does not consume the turn", async ({ page }) => {
@@ -106,15 +225,15 @@ test("restoration keeps the active word and a paused clock does not consume the 
   const input = page.getByRole("textbox", { name: "Your word" });
   await expect(input).toHaveValue("appl");
   await page.clock.fastForward(3000);
-  await expect(page.getByRole("timer")).toContainText("7");
+  await expect(page.getByRole("timer")).toContainText("12");
   await receive(page, "ROOM_PAUSED", { code: room.code, players: roster, pausedAt: state.serverNow + 3000, serverNow: state.serverNow + 3000, kickVotes: [] });
   await page.clock.fastForward(30000);
-  await expect(page.getByRole("timer")).toContainText("7");
+  await expect(page.getByRole("timer")).toContainText("12");
   await receive(page, "room-restored", { ...finishRoom, playerId: roster[0].id, screen: "game", pausedAt: null, serverNow: state.serverNow + 33000,
     gameState: { ...state, turnEndsAt: state.turnEndsAt + 30000, typingText: "apple" }, chatMessages: [] });
   await expect(input).toHaveValue("apple");
   await expect(input).toBeEnabled();
-  await expect(page.getByRole("timer")).toContainText("7");
+  await expect(page.getByRole("timer")).toContainText("12");
 });
 
 for (const height of [380, 300]) {
@@ -126,9 +245,12 @@ for (const height of [380, 300]) {
     const frame = await input.boundingBox();
     expect(frame.y).toBeGreaterThan(60);
     expect(frame.y + frame.height).toBeLessThanOrEqual(height);
+    const prefix = await page.getByTestId("required-prefix").boundingBox();
+    expect(prefix.y).toBeGreaterThanOrEqual(0);
+    expect(prefix.y + prefix.height).toBeLessThanOrEqual(height);
     const arena = await page.getByTestId("finish-word-stage").boundingBox();
     const controls = await page.getByLabel("Word controls").boundingBox();
-    expect(arena.y + arena.height).toBeLessThanOrEqual(controls.y + 1);
+    expect(arena.y + arena.height <= controls.y + 1 || controls.y + controls.height <= arena.y + 1).toBe(true);
     await page.getByRole("button", { name: "Submit word", exact: true }).click();
     expect(await page.evaluate(() => window.testSocket.sent.some((entry) => entry.event === "submit_word"))).toBe(true);
   });

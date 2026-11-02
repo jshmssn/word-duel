@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import useFinishWord from "../hooks/useFinishWord.js";
+import useVisualViewport from "../hooks/useVisualViewport.js";
 import "./FinishWord.css";
 
 export const FINISH_WORD_CHARACTERS = Object.freeze([
@@ -110,7 +111,8 @@ export function FinishWordLobby({ code, players, myId, creatorId, maxPlayers = 8
   const activeRequest = useRef(false);
   const isHost = creatorId === myId;
   const me = players.find((player) => player.id === myId);
-  const canStart = connected && players.length >= 2 && players.every((player) => player.characterId && player.connected !== false);
+  const canStart = connected && players.length >= 2 && players.length <= maxPlayers &&
+    players.every((player) => player.ready && player.characterId && player.connected !== false);
 
   async function act(event, data, key) {
     if (!connected || activeRequest.current) return;
@@ -152,12 +154,13 @@ export function FinishWordLobby({ code, players, myId, creatorId, maxPlayers = 8
       <aside className="finish-word-lobby-sidebar">
         <section className="finish-word-party-panel"><div className="finish-word-panel-title"><h2>The lineup</h2><span>{players.length} / {maxPlayers}</span></div><ul className="finish-word-party-list" aria-label="Room players">{players.map((player) => <li key={player.id}>
           <span className="finish-word-party-avatar">{player.characterId ? <FinishWordCharacter characterId={player.characterId} decorative /> : <span aria-hidden="true">?</span>}</span>
-          <div><strong>{playerName(player)}{player.id === myId && <small>YOU</small>}</strong><span>{player.connected === false ? "Reconnecting" : player.characterId ? characterFor(player.characterId).name : "Choosing a character…"}</span></div>
+          <div><strong>{playerName(player)}{player.id === myId && <small>YOU</small>}</strong><span>{player.connected === false ? "Reconnecting" : player.characterId ? characterFor(player.characterId).name : "Choosing a character…"}</span><span className={`finish-word-ready-status ${player.ready && player.connected !== false ? "ready" : ""}`}>{player.connected === false ? "Not ready" : player.ready ? "Ready" : "Not ready"}</span></div>
           {player.id === creatorId && <span className="finish-word-host-tag">HOST</span>}
         </li>)}</ul></section>
-        <section className="finish-word-briefing"><span className="eyebrow">THE RULES ARE SIMPLE</span><h2>Keep the word alive.</h2><div><strong>10s</strong><p>to find a valid word on your turn</p></div><div><FinishWordHearts lives={3} /><p>Wrong word or timeout costs one life.</p></div><p>Start with the last letter. After 10 accepted words, match the last <strong>two</strong>. Every word can be used once.</p><p>Last player standing wins.</p></section>
-        {isHost ? <button type="button" className="btn-fun btn-fun-yellow finish-word-start" disabled={!canStart || pending !== null} onClick={() => act("start_game", {}, "start")}>{pending === "start" ? "Starting…" : "Start Finish the Word"}<span aria-hidden="true">→</span></button> : <p className="finish-word-lobby-wait" role="status">{me?.characterId ? "Your character is locked in. Waiting for the host to start." : "Choose a character to join the game."}</p>}
-        {isHost && !canStart && <p className="finish-word-lobby-wait">{players.length < 2 ? "Invite at least one other player to start." : "Everyone must choose a character and be connected."}</p>}
+        <section className="finish-word-briefing"><span className="eyebrow">THE RULES ARE SIMPLE</span><h2>Keep the word alive.</h2><div><strong>15s</strong><p>to find a valid word on your turn</p></div><div><FinishWordHearts lives={3} /><p>Only a timeout costs one life. Invalid word? Try again while time remains.</p></div><p>Start with the last letter. After 10 accepted words, match the last <strong>two</strong>. Every word can be used once.</p><p>Last player standing wins.</p></section>
+        <button type="button" className={`btn-fun ${me?.ready ? "btn-fun-ghost" : "btn-fun-green"} finish-word-ready-button`} aria-pressed={Boolean(me?.ready)} disabled={!connected || !me?.characterId || pending !== null} onClick={() => act("toggle-ready", {}, "ready")}>{pending === "ready" ? "Updating…" : me?.ready ? "Not ready" : "Ready up"}</button>
+        {isHost ? <button type="button" className="btn-fun btn-fun-yellow finish-word-start" disabled={!canStart || pending !== null} onClick={() => act("start_game", {}, "start")}>{pending === "start" ? "Starting…" : "Start Finish the Word"}<span aria-hidden="true">→</span></button> : <p className="finish-word-lobby-wait" role="status">{!me?.characterId ? "Choose a character, then ready up." : me.ready ? "You're ready. Waiting for the host to start." : "Ready up when you're set to play."}</p>}
+        {isHost && !canStart && <p className="finish-word-lobby-wait">{players.length < 2 ? "Invite at least one other player to start." : "Everyone must choose a character, ready up, and be connected."}</p>}
       </aside>
     </div>
   </div>;
@@ -165,37 +168,31 @@ export function FinishWordLobby({ code, players, myId, creatorId, maxPlayers = 8
 
 function FinishWordStage({ gameState, myId, localWord }) {
   const viewport = useRef(null);
-  const [geometry, setGeometry] = useState({ width: 700, scale: 1 });
+  const [width, setWidth] = useState(700);
   const players = gameState.players;
   const actorStep = 190;
   const worldWidth = Math.max(720, players.length * actorStep + 180);
   const activeIndex = Math.max(0, players.findIndex((player) => player.id === gameState.currentPlayerId));
   const activeX = 180 + activeIndex * actorStep;
-  const { width, scale } = geometry;
-  const cameraX = width / 2 - activeX * scale;
+  const cameraX = width / 2 - activeX;
   useLayoutEffect(() => {
     const element = viewport.current;
     if (!element) return;
     const update = () => {
-      const bounds = element.getBoundingClientRect();
-      const actor = element.querySelector(".finish-word-actor.active");
-      const actorBottom = actor ? parseFloat(getComputedStyle(actor).bottom) || 0 : 35;
-      // Reserve room for the nametag and a multi-line live word as well as the
-      // character. A short landscape/keyboard viewport must not crop the text.
-      const neededHeight = (actor?.offsetHeight || 210) + actorBottom + 90;
-      const nextScale = Math.min(bounds.width < 420 ? 0.86 : 1, Math.max(.15, (bounds.height - 20) / neededHeight));
-      setGeometry((previous) => previous.width === bounds.width && previous.scale === nextScale ? previous : { width: bounds.width, scale: nextScale });
+      // Follow the active seat horizontally without zooming when the phone's
+      // keyboard changes the available height. CSS reserves the actor's space.
+      setWidth(element.clientWidth);
     };
     update();
     const observer = new ResizeObserver(update); observer.observe(element);
     return () => observer.disconnect();
-  }, [activeIndex, players.length]);
+  }, []);
 
   return <section className="finish-word-stage-block" aria-label="Character arena">
     <div className="finish-word-stage-viewport" ref={viewport} data-testid="finish-word-stage">
       <div className="finish-word-stage-sky" aria-hidden="true"><span>A</span><span>Z</span><span>W</span><span>E</span></div>
       <span className="finish-word-stage-caption">{gameState.pausedAt ? "GAME PAUSED" : gameState.currentPlayerId === myId ? "THE WORD IS YOURS" : "LIVE WORD ARENA"}</span>
-      <div className="finish-word-stage-camera" data-testid="finish-word-camera" data-active-player={gameState.currentPlayerId} style={{ width: worldWidth, transform: `translate3d(${cameraX}px, 0, 0) scale(${scale})` }}>
+      <div className="finish-word-stage-camera" data-testid="finish-word-camera" data-active-player={gameState.currentPlayerId} style={{ width: worldWidth, transform: `translate3d(${cameraX}px, 0, 0)` }}>
         <div className="finish-word-stage-floor" style={{ width: worldWidth + 400 }} aria-hidden="true" />
         {players.map((player, index) => {
           const active = gameState.currentPlayerId === player.id && gameState.status === "PLAYING";
@@ -228,8 +225,9 @@ function FinishWordResults({ gameState, myId, connected, onRematch }) {
 
 export function FinishWordGameView({ gameState, myId, socket, connected, onFeedback, onRematch }) {
   const controller = useFinishWord({ gameState, socket, myId, connected, onFeedback });
+  const viewport = useVisualViewport();
   const { word, changeWord, submit, inputRef, pending, error, remaining, canPlay, isMyTurn, me, activePlayer } = controller;
-  const total = gameState.turnDuration || 10;
+  const total = gameState.turnDuration || 15;
   const progress = Math.min(100, Math.max(0, remaining / total * 100));
   const prefix = gameState.requiredPrefix || "?";
   const status = !connected ? "Reconnecting to the arena…" : gameState.pausedAt ? "Game paused while a player reconnects." : me?.isAlive === false ? "You're out. Watch the remaining word warriors." : isMyTurn ? "Your turn. Keep the chain alive." : `${playerName(activePlayer)} is finding a word.`;
@@ -237,7 +235,7 @@ export function FinishWordGameView({ gameState, myId, socket, connected, onFeedb
 
   if (gameState.status === "ENDED") return <FinishWordResults gameState={gameState} myId={myId} connected={connected} onRematch={onRematch} />;
 
-  return <div className={`screen finish-word-game ${isMyTurn ? "your-turn" : ""}`}>
+  return <div className={`screen finish-word-game ${isMyTurn ? "your-turn" : ""} ${viewport?.height <= 500 ? "compact" : ""}`}>
     <header className="finish-word-game-heading"><div><span className="eyebrow">FINISH THE WORD</span><h1>{isMyTurn ? "Your move, " : "Keep the "}<span>{isMyTurn ? "word warrior." : "chain alive."}</span></h1></div><span className={`finish-word-difficulty ${gameState.hardMode ? "hard" : ""}`}>{gameState.hardMode ? "TWO LETTERS · HARD MODE" : `ONE LETTER · ${gameState.successfulTurns || 0}/${gameState.hardModeAfter || 10} TO HARD MODE`}</span></header>
     <div className="finish-word-game-layout">
       <FinishWordStage gameState={gameState} myId={myId} localWord={word} />
@@ -248,8 +246,8 @@ export function FinishWordGameView({ gameState, myId, socket, connected, onFeedb
         <div className="finish-word-chain" aria-label="Recent accepted words"><span>THE CHAIN SO FAR</span>{history.length ? <ol>{history.map((entry, index) => <li key={`${entry.turnId || index}:${entry.word}`}>{entry.word}<span aria-hidden="true">→</span></li>)}</ol> : <p>Make the first move.</p>}</div>
         <form className="finish-word-entry" onSubmit={submit}>
           <label htmlFor="finish-word-input">{isMyTurn ? "Your word" : "Watch the live word above the active player"}</label>
-          <div className="finish-word-input-row"><input id="finish-word-input" ref={inputRef} aria-label="Your word" value={word} onChange={(event) => changeWord(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && event.nativeEvent.isComposing) event.preventDefault(); }} disabled={!canPlay || pending} placeholder={isMyTurn ? `${prefix.toUpperCase()}…` : "Waiting for your turn"} maxLength={64} autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} enterKeyHint="send" /><button type="submit" disabled={!canPlay || pending || !word.trim()} aria-label="Submit word">{pending ? "…" : <span aria-hidden="true">→</span>}</button></div>
-          <p className="finish-word-turn-status" role="status">{status}</p>{error && <p className="finish-word-error" role="alert">{error}</p>}
+          <div className={`finish-word-input-row ${error ? "invalid" : ""}`}><input id="finish-word-input" ref={inputRef} aria-label="Your word" aria-invalid={Boolean(error)} aria-describedby={error ? "finish-word-input-error" : undefined} value={word} onChange={(event) => changeWord(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && event.nativeEvent.isComposing) event.preventDefault(); }} disabled={!canPlay || pending} placeholder={isMyTurn ? `${prefix.toUpperCase()}…` : "Waiting for your turn"} maxLength={64} autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} enterKeyHint="send" /><button type="submit" disabled={!canPlay || pending || !word.trim()} aria-label="Submit word">{pending ? "…" : <span aria-hidden="true">→</span>}</button></div>
+          <p className="finish-word-turn-status" role="status">{status}</p>{error && <p id="finish-word-input-error" className="finish-word-error" role="alert">{error}</p>}
         </form>
         <p className="finish-word-input-hint">2+ letters · English words · no repeats</p>
       </section>

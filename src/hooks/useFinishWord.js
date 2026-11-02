@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { SFX } from "../audio.js";
 
 // The clock is visual only. Turn order, deadlines, hearts and dictionary checks
 // always come from the server; every action is bound to a particular turn.
@@ -6,6 +7,7 @@ export default function useFinishWord({ gameState, socket, myId, connected, onFe
   const [word, setWord] = useState(() => gameState.currentPlayerId === myId ? gameState.typingText || "" : "");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [rejectedAttempts, setRejectedAttempts] = useState(0);
   const [now, setNow] = useState(Date.now);
   const inputRef = useRef(null);
   const request = useRef(null);
@@ -56,9 +58,18 @@ export default function useFinishWord({ gameState, socket, myId, connected, onFe
     clearTimeout(typingTimer.current);
   }, []);
 
+  useEffect(() => {
+    if (!rejectedAttempts || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const animation = inputRef.current?.closest(".finish-word-input-row")?.animate(
+      [0, -8, 8, -6, 6, -3, 3, 0].map((x) => ({ transform: `translateX(${x}px)` })),
+      { duration: 380, easing: "ease-out" },
+    );
+    return () => animation?.cancel();
+  }, [rejectedAttempts]);
+
   function changeWord(value) {
     if (!canPlay || request.current) return;
-    const text = value.slice(0, 64);
+    const text = value.replace(/\s/g, "").slice(0, 64);
     setWord(text); setError("");
     latestTyping.current = text;
     if (typingTimer.current) return;
@@ -78,15 +89,22 @@ export default function useFinishWord({ gameState, socket, myId, connected, onFe
     setPending(true); setError("");
     clearTimeout(typingTimer.current);
     typingTimer.current = null;
-    socket.emit("player_typing", { code: gameState.code, turnId: gameState.turnId, text: word });
+    const cleanedWord = word.replace(/\s/g, "");
+    setWord(cleanedWord);
+    latestTyping.current = cleanedWord;
+    socket.emit("player_typing", { code: gameState.code, turnId: gameState.turnId, text: cleanedWord });
     try {
       const response = await socket.timeout(5000).emitWithAck("submit_word", {
-        code: gameState.code, turnId: gameState.turnId, word,
+        code: gameState.code, turnId: gameState.turnId, word: cleanedWord,
       });
       if (request.current !== token) return;
       if (!response?.success) {
         const message = response?.message || "Could not submit your word.";
         setError(message); onFeedback(message, "error");
+      } else if (response.accepted === false && response.retryable) {
+        setError(`${response.message} Try again before time runs out.`);
+        setRejectedAttempts((count) => count + 1);
+        SFX.wrong();
       }
     } catch {
       if (request.current !== token) return;

@@ -2,6 +2,34 @@ import { useEffect, useLayoutEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { IconChat, IconX, IconSend } from "../icons/Icons.jsx";
 import useVisualViewport from "../hooks/useVisualViewport.js";
+import { SFX } from "../audio.js";
+
+// This lives beside the screen router so cards, prompts and results cannot
+// unmount the input or discard the user's unfinished message.
+export function RoomChat({ messages, onSend, myId, colorRoundId }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [unread, setUnread] = useState(0);
+  const previousCount = useRef(messages.length);
+  const previousColorRound = useRef(null);
+  useLayoutEffect(() => {
+    if (!colorRoundId || colorRoundId === previousColorRound.current) return;
+    previousColorRound.current = colorRoundId;
+    // Touch devices need the card unobstructed, including in landscape. Keep
+    // the draft in FloatingChat and let mouse users keep their chat open.
+    if (navigator.userAgentData?.mobile || window.matchMedia("(hover: none) and (pointer: coarse)").matches) setIsOpen(false);
+  }, [colorRoundId]);
+  useEffect(() => {
+    const added = messages.length - previousCount.current;
+    if (added > 0) {
+      if (!isOpen) setUnread((count) => count + added);
+      if (messages.slice(-added).some((message) => !message.system && message.playerId !== myId)) SFX.chat();
+    }
+    previousCount.current = messages.length;
+  }, [messages, isOpen, myId]);
+  return <FloatingChat messages={messages} onSend={onSend} myId={myId} isOpen={isOpen} onToggle={() => {
+    SFX.tap(); setIsOpen((open) => !open); setUnread(0);
+  }} unread={unread} />;
+}
 
 export default function FloatingChat({ messages, onSend, myId, isOpen, onToggle, unread }) {
   const [text, setText] = useState("");

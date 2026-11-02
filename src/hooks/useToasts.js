@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 export default function useToasts() {
   const [toasts, setToasts] = useState([]);
   const timers = useRef(new Map());
+  const recent = useRef(new Map());
   const dismiss = useCallback((id) => {
     clearTimeout(timers.current.get(id));
     timers.current.delete(id);
@@ -10,6 +11,11 @@ export default function useToasts() {
   }, []);
   const notify = useCallback((message, tone = "info") => {
     if (!message) return;
+    const now = Date.now();
+    recent.current.forEach((time, key) => { if (now - time >= 4500) recent.current.delete(key); });
+    const key = `${tone}:${message}`;
+    if (recent.current.has(key)) return;
+    recent.current.set(key, now);
     const id = Date.now() + Math.random();
     setToasts((previous) => [...previous.slice(-3), { id, message, tone }]);
     timers.current.set(id, setTimeout(() => dismiss(id), 4500));

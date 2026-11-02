@@ -217,6 +217,23 @@ html.game-viewport { height: 100%; overflow: hidden; overscroll-behavior: none; 
 .room-pause-card h2 { margin: 10px 0; font: 700 25px var(--font-display); }
 .room-pause-card p { margin: 9px 0; color: var(--muted); font-size: 13px; }
 .room-pause-card .btn-fun { margin-top: 17px; }
+.room-connection-list { list-style: none; padding: 0; margin: 18px 0; text-align: left; }
+.room-connection-list > li { padding: 12px 0; border-bottom: 1px solid #61799d55; }
+.room-connection-player { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+.room-connection-player strong { overflow-wrap: anywhere; min-width: 0; }
+.player-connection-tag { display: inline-flex; flex: none; padding: 4px 7px; border-radius: 7px; font-size: 10px; font-weight: 700; line-height: 1.3; background: #765529; color: #ffe4a3; }
+.player-connection-tag.status-connected { color: #afffdc; background: #225646; }
+.player-connection-tag.status-disconnected { color: #ffc1ce; background: #672f43; }
+.room-kick-vote .color-vote-actions { flex-wrap: wrap; }
+.room-kick-vote .color-vote-actions button { flex-basis: 100%; min-height: 38px; }
+.room-pause-controls { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 17px; }
+.room-pause-card .room-pause-controls .btn-fun { flex: 1; margin-top: 0; }
+.room-pause-overlay.prompt-overlay { z-index: 180; top: var(--modal-viewport-top, 0px); }
+.color-vote-overlay.prompt-overlay { z-index: 90; padding: 16px; }
+.color-vote-overlay .color-skip-vote { width: min(460px, 100%); max-height: 100%; overflow-y: auto; padding: 24px; }
+.color-vote-overlay .color-vote-actions { flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+.color-vote-overlay .color-vote-actions button { min-height: 44px; flex-basis: 130px; }
+.color-vote-minimize { margin-top: 16px; width: 100%; }
 .in-game .color-timer.turn-timer-wrap { flex: none; padding: 9px 15px; margin: 0; border-color: #5ce6b960; background: linear-gradient(110deg,#183c3d,#17283f); box-shadow: inset 0 0 24px #6ee9b90a; }
 .in-game .color-timer .timer-label { display: flex; align-items: center; margin-bottom: 4px; font-size: 12px; }
 .in-game .color-timer .timer-label-title { display: inline-flex; align-items: center; gap: 8px; color: #c5f6e2; }

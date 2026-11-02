@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import ModalOverlay from "./ModalOverlay.jsx";
+import RoomPauseModal from "./RoomPauseModal.jsx";
 import useVisualViewport from "../hooks/useVisualViewport.js";
 import {
   IconSword, IconLightning, IconChat, IconShield, IconTarget,
@@ -21,7 +22,7 @@ export function Brand({ compact = false, gameMode }) {
   );
 }
 
-export function ExperienceShell({ children, screen, code, gameMode, connected, audioEnabled, onAudioToggle, onShowRules, toasts, onDismissToast, onQuit, leaving, roomPause, restoring, onReconnect }) {
+export function ExperienceShell({ children, screen, code, gameMode, connected, audioEnabled, onAudioToggle, onShowRules, toasts, onDismissToast, onQuit, leaving, roomPause, restoring, onReconnect, players, myId, onKickVote }) {
   const viewport = useVisualViewport();
   const inGame = screen === "game";
   const activeMode = screen === "lobby" ? null : gameMode;
@@ -60,7 +61,7 @@ export function ExperienceShell({ children, screen, code, gameMode, connected, a
       </header>
       <main key={screen} className={`view-frame view-${screen}`}>{children}</main>
       <button className="help-launcher howto-link" onClick={onShowRules} type="button"><span aria-hidden="true">?</span> How to play</button>
-      {(roomPause || restoring) && <div className="room-pause-overlay" role="status"><div className="room-pause-card"><span className="pulse-dot" /><h2>{restoring ? "Restoring your room…" : "Room paused"}</h2><p>{roomPause?.message || "Reconnecting you to your seat and syncing the game."}</p><p>Game timers will resume when everyone is back.</p><button className="btn-fun btn-fun-yellow" onClick={onReconnect} disabled={restoring}>Reconnect</button></div></div>}
+      {(screen === "game" || screen === "gameover") && (roomPause || restoring) && <RoomPauseModal players={players} myId={myId} pause={roomPause} restoring={restoring} connected={connected} onReconnect={onReconnect} onVote={onKickVote} onQuit={onQuit} leaving={leaving} />}
       <footer className="site-footer">
         <span>{title} <span className="footer-cross">✦</span> THINK. PLAY. CONNECT.</span>
         <span>PLAY TOGETHER, ANYWHERE</span>

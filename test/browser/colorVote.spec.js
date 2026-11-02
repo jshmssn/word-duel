@@ -31,16 +31,14 @@ for (const viewport of [{ width: 280, height: 653 }, { width: 320, height: 568 }
     await page.setViewportSize(viewport);
     const state = await start(page);
     const vote = await openVote(page, state);
-    const panel = page.getByRole("region", { name: "Skip time vote" });
+    const panel = page.getByRole("dialog", { name: "Vote to skip time" });
     await expect(panel).toContainText("2 of 3 players must vote Yes");
     await expect(page.getByRole("timer", { name: "20 seconds to vote" })).toBeVisible();
     await page.clock.fastForward(5000);
     await expect(page.getByRole("timer", { name: "15 seconds to vote" })).toBeVisible();
-    await expect.poll(() => page.locator(".color-picker-panel").evaluate((element) => {
+    await expect.poll(() => panel.evaluate((element) => {
       const frame = element.getBoundingClientRect();
-      const header = document.querySelector(".site-header").getBoundingClientRect();
-      const edit = element.querySelector(".color-edit-button").getBoundingClientRect();
-      return frame.top >= header.bottom && edit.bottom <= innerHeight - 63;
+      return frame.top >= 0 && frame.bottom <= innerHeight && frame.left >= 0 && frame.right <= innerWidth;
     })).toBe(true);
     await expect(page.locator(".color-timer .timer-seconds")).toHaveText("25s");
     const yes = page.getByRole("button", { name: "Yes, show results", exact: true });
@@ -72,7 +70,7 @@ test("No votes, rejected votes, expired polls and stale rounds keep the timer in
   await expect(page.locator(".color-timer .timer-seconds")).toHaveText("30s");
   await expect(page.getByRole("button", { name: "Edit answer" })).toBeVisible();
   await receive(page, "COLOR_SKIP_VOTE", { code: room.code, roundId: "stale", vote: { ...vote, id: "stale" } });
-  await expect(page.getByRole("region", { name: "Skip time vote" })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Vote to skip time" })).toHaveCount(0);
 });
 
 test("all answers arriving below 20 seconds do not display or request a skip vote", async ({ page }) => {
@@ -80,7 +78,7 @@ test("all answers arriving below 20 seconds do not display or request a skip vot
   await page.clock.fastForward(11000);
   await receive(page, "SUBMISSION_UPDATE", { code: room.code, roundId: state.roundId, submittedPlayerIds: roster.map((player) => player.id) });
   await expect(page.locator(".color-timer .timer-seconds")).toHaveText("19s");
-  await expect(page.getByRole("region", { name: "Skip time vote" })).toHaveCount(0);
+  await expect(page.getByRole("dialog", { name: "Vote to skip time" })).toHaveCount(0);
   expect(await page.evaluate(() => window.testSocket.sent.some((entry) => entry.event === "VOTE_COLOR_SKIP"))).toBe(false);
 });
 

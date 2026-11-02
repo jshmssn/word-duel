@@ -5,7 +5,7 @@ import SlotMachine from "./SlotMachine.jsx";
 import { SFX, playTone, isAudioEnabled, setAudioEnabled } from "./audio.js";
 import { ExperienceShell, ConfettiBurst, ProgressBar, RulesDialog, SectionHeading, StepsPreview } from "./components/Experience.jsx";
 import LetterWorkbench from "./components/LetterWorkbench.jsx";
-import FloatingChat from "./components/FloatingChat.jsx";
+import { RoomChat } from "./components/FloatingChat.jsx";
 import useToasts from "./hooks/useToasts.js";
 import { readRoomSession, saveRoomSession, clearRoomSession } from "./roomSession.js";
 import ModalOverlay from "./components/ModalOverlay.jsx";
@@ -81,7 +81,7 @@ function withLetterCount(letters, letter, count) {
 
 let socket = null;
 function getSocket() {
-  if (!socket) socket = io(SERVER_URL);
+  if (!socket) socket = io(SERVER_URL, { auth: (done) => done({ session: readRoomSession() }) });
   return socket;
 }
 
@@ -261,8 +261,6 @@ function WaitingScreen({
   players,
   myId,
   gameLogs,
-  chatMessages,
-  onChat,
   onGameStart,
   turnDuration,
   roundLimit,
@@ -282,27 +280,13 @@ function WaitingScreen({
   const [showSlotMachine, setShowSlotMachine] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [copied, setCopied] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [unread, setUnread] = useState(0);
-  const prevMsgCount = useRef(chatMessages.length);
   const myPlayer = players.find((p) => p.id === myId);
   const imReady = Boolean(myPlayer?.ready);
   useEffect(() => {
     if (recoveryCategory) { setSelectedCategory(recoveryCategory); setShowSlotMachine(true); }
   }, [recoveryCategory]);
 
-  useEffect(() => {
-    if (!chatOpen && chatMessages.length > prevMsgCount.current) {
-      setUnread((u) => u + (chatMessages.length - prevMsgCount.current));
-      SFX.chat();
-    }
-    prevMsgCount.current = chatMessages.length;
-  }, [chatMessages, chatOpen]);
 
-  const handleChatToggle = () => {
-    setChatOpen((o) => !o);
-    setUnread(0);
-  };
 
   const copyCode = async () => {
     try {
@@ -402,7 +386,7 @@ function WaitingScreen({
               <div className="player-slots">
                 {Array.from({ length: maxPlayers }, (_, index) => index).map((i) => { const p = players[i]; const [c1, c2] = avatarGrad(i); return <div key={i} className={`player-card ${p ? "filled" : "empty"} ${p?.ready ? "ready-yes" : ""}`}>
                   <div className="player-avatar-fun" style={p ? { background: `linear-gradient(135deg,${c1},${c2})` } : {}}>{p ? p.username[0].toUpperCase() : "?"}</div>
-                  <div className="player-ident"><div className="player-name-fun"><span className="player-display-name">{p ? p.username : "Awaiting challenger"}</span>{p?.id === myId && <span className="you-tag">YOU</span>}{p?.isBot && <span className="you-tag">BOT</span>}</div><div className="player-meta-row">{p ? isColorCard ? <span className="player-accuracy-stat" title={p.previousMatchCardCount ? `Average accuracy from the previous completed match (${p.previousMatchCardCount} cards)` : "No previous match recorded"}><IconTarget size={13} color="currentColor" /><strong>{(p.previousMatchAverageAccuracy ?? 0).toFixed(2)}%</strong> LAST MATCH AVG.</span> : <span><IconTrophy size={13} color="currentColor" /> {p.wins || 0} WINS</span> : <span>SHARE YOUR INVITE CODE ABOVE</span>}</div></div>
+                  <div className="player-ident"><div className="player-name-fun"><span className="player-display-name">{p ? p.username : "Awaiting challenger"}</span>{p?.id === myId && <span className="you-tag">YOU</span>}{p?.isBot && <span className="you-tag">BOT</span>}{p?.connected === false && <span className="player-connection-tag status-reconnecting">Reconnecting</span>}</div><div className="player-meta-row">{p ? isColorCard ? <span className="player-accuracy-stat" title={p.previousMatchCardCount ? `Average accuracy from the previous completed match (${p.previousMatchCardCount} cards)` : "No previous match recorded"}><IconTarget size={13} color="currentColor" /><strong>{(p.previousMatchAverageAccuracy ?? 0).toFixed(2)}%</strong> LAST MATCH AVG.</span> : <span><IconTrophy size={13} color="currentColor" /> {p.wins || 0} WINS</span> : <span>SHARE YOUR INVITE CODE ABOVE</span>}</div></div>
                   {p ? <span className={`ready-pill ${p.ready ? "yes" : "no"}`}>{p.ready ? <><IconCheck size={13} color="currentColor" /> READY</> : "NOT READY"}</span> : <span className="empty-player-pulse"><span className="pulse-dot" /></span>}
                 </div>; })}
               </div>
@@ -424,7 +408,6 @@ function WaitingScreen({
       </div>
       {countdown !== null && <ModalOverlay className="countdown-overlay" role="status"><div className="countdown-card"><span className="eyebrow">GET READY</span><div className="countdown-num" key={countdown}>{countdown}</div><div className="countdown-label-fun"><IconLightning size={19} color="currentColor" /> {isColorCard ? "COLOR CARD STARTING" : "DUEL STARTING"}</div></div></ModalOverlay>}
       {showSlotMachine && selectedCategory && <SlotMachine selectedCategoryName={selectedCategory} onDone={handleSlotMachineDone} />}
-      <FloatingChat messages={chatMessages} onSend={onChat} myId={myId} isOpen={chatOpen} onToggle={handleChatToggle} unread={unread} />
     </div>
   );
 }
@@ -437,8 +420,6 @@ function GameScreen({
   setGameLogs,
   onGameOver,
   onReturnToWaiting,
-  chatMessages,
-  onChat,
   onFeedback,
 }) {
   const {
@@ -457,8 +438,6 @@ function GameScreen({
   const [confirmedLetters, setConfirmedLetters] = useState(gameState.confirmedLetters || []);
   const [askedLetters, setAskedLetters] = useState(gameState.askedLetters || {});
   const [turn, setTurn] = useState(currentTurn);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [unread, setUnread] = useState(0);
   const [timerRemaining, setTimerRemaining] = useState(gameState.timerRemaining ?? turnDuration ?? 0);
   const [timerTotal, setTimerTotal] = useState(turnDuration || 0);
 
@@ -492,7 +471,6 @@ function GameScreen({
   }, [onFeedback]);
   useEffect(() => () => clearTimeout(rewardTimeout.current), []);
 
-  const prevMsgCount = useRef(chatMessages.length);
   const prevRemaining = useRef(turnDuration || 0);
   const initialTurnSoundPlayed = useRef(false);
 
@@ -511,14 +489,6 @@ function GameScreen({
     SFX.yourTurn();
   }, [currentTurn, myId]);
 
-  // Chat unread tracking
-  useEffect(() => {
-    if (!chatOpen && chatMessages.length > prevMsgCount.current) {
-      setUnread((u) => u + (chatMessages.length - prevMsgCount.current));
-      SFX.chat();
-    }
-    prevMsgCount.current = chatMessages.length;
-  }, [chatMessages, chatOpen]);
 
   // Timer warning sound
   useEffect(() => {
@@ -743,10 +713,6 @@ function GameScreen({
     setGuessInput("");
   };
 
-  const handleChatToggle = () => {
-    setChatOpen((o) => !o);
-    setUnread(0);
-  };
 
 
   return (
@@ -1058,7 +1024,6 @@ function GameScreen({
           </aside>
         </div>
       </div>
-      <FloatingChat messages={chatMessages} onSend={onChat} myId={myId} isOpen={chatOpen} onToggle={handleChatToggle} unread={unread} />
     </div>
   );
 }
@@ -1124,7 +1089,7 @@ function AnimatedRevealWord({ label, word, variant, delay = 0 }) {
   );
 }
 
-function GameOverScreen({ result, myId, onRematch, chatMessages, onChat, onQuit, leaving }) {
+function GameOverScreen({ result, myId, onRematch, onQuit, leaving }) {
   const isWinner = result.winnerId === myId;
   const resultPlayers = Array.isArray(result.players) ? result.players : [];
   const opponent = resultPlayers.find((player) => player.id === result.opponentsByPlayer?.[myId]) || resultPlayers.find((player) => player.id !== myId);
@@ -1137,22 +1102,8 @@ function GameOverScreen({ result, myId, onRematch, chatMessages, onChat, onQuit,
     String(opponentResultWord).replace(/\s/g, "").length,
   );
   const [revealDone, setRevealDone] = useState(false);
-  const [chatOpen, setChatOpen] = useState(false);
-  const [unread, setUnread] = useState(0);
-  const prevMsgCount = useRef(chatMessages.length);
 
-  useEffect(() => {
-    if (!chatOpen && chatMessages.length > prevMsgCount.current) {
-      setUnread((u) => u + (chatMessages.length - prevMsgCount.current));
-      SFX.chat();
-    }
-    prevMsgCount.current = chatMessages.length;
-  }, [chatMessages, chatOpen]);
 
-  const handleChatToggle = () => {
-    setChatOpen((o) => !o);
-    setUnread(0);
-  };
 
   useEffect(() => {
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) {
@@ -1278,14 +1229,6 @@ function GameOverScreen({ result, myId, onRematch, chatMessages, onChat, onQuit,
         </div>
       </div>
 
-      <FloatingChat
-        messages={chatMessages}
-        onSend={onChat}
-        myId={myId}
-        isOpen={chatOpen}
-        onToggle={handleChatToggle}
-        unread={unread}
-      />
     </div>
   );
 }
@@ -1315,7 +1258,7 @@ export default function App() {
   const { toasts, notify: showFeedback, dismiss: dismissToast } = useToasts();
   const [leaving, setLeaving] = useState(false);
   const roster = useRef([]);
-  const lastVoteNotice = useRef("");
+  const voteNotices = useRef(new Set());
   const currentColorRound = useRef(null);
   const identity = useRef(readRoomSession()?.playerId || getSocket().id);
   const [roomPause, setRoomPause] = useState(null);
@@ -1361,23 +1304,32 @@ export default function App() {
       currentColorRound.current = state.gameMode === "color-card" ? state.gameState?.roundId : null;
       setScreen(state.screen);
       setRecoveryCategory(state.pendingCategory || null);
-      setRoomPause(state.pausedAt ? { message: "Waiting for the other players to reconnect. Timers are paused." } : null);
+      setRoomPause(state.pausedAt ? { ...state, serverClockOffset: clock, message: "Waiting for the other players to reconnect. Timers are paused." } : null);
       setRestoring(false); setConnected(true);
     };
+    let resuming = false;
     const onConnect = async () => {
       setConnected(true);
       const session = readRoomSession();
       if (!session) { identity.current = sock.id; setMyId(sock.id); return; }
+      if (resuming) return;
+      resuming = true;
       setRestoring(true);
       try {
         const response = await sock.timeout(5000).emitWithAck("resume-room", session);
         if (!response.success) { resetRoom(); showFeedback(response.message, "error"); }
       } catch { setRestoring(false); setRoomPause({ message: "Could not restore the room yet. Reconnecting…" }); showFeedback("Room recovery is taking longer than expected. Tap Reconnect to retry.", "error"); }
+      finally { resuming = false; }
     };
     const onDisconnect = () => {
       setConnected(false);
       if (readRoomSession()) {
-        setRoomPause({ message: "Reconnecting to your room. Your seat is reserved for 90 seconds." });
+        setRoomPause((previous) => ({ ...previous, message: "Reconnecting to your room. Your seat is reserved while you reconnect." }));
+        setPlayers((previous) => {
+          const updated = previous.map((player) => player.id === identity.current ? { ...player, connected: false, connectionStatus: "reconnecting" } : player);
+          roster.current = updated;
+          return updated;
+        });
         setGameState((previous) => previous ? { ...previous, pausedAt: Date.now() + (previous.serverClockOffset || 0) } : previous);
         setGameOverResult((previous) => previous ? { ...previous, pausedAt: Date.now() + (previous.serverClockOffset || 0) } : previous);
       }
@@ -1393,17 +1345,21 @@ export default function App() {
       else if (readRoomSession()) onConnect();
     };
     const onError = () => showFeedback("The server is unavailable. Reconnecting…", "error");
+    const onSessionError = ({ message }) => { resetRoom(); showFeedback(message, "error"); };
     sock.on("connect", onConnect);
     sock.on("disconnect", onDisconnect);
     sock.on("connect_error", onError);
     sock.on("room-session", onSession);
     sock.on("room-restored", onRestored);
+    sock.on("room-session-error", onSessionError);
+    sock.on("room-kicked", onSessionError);
     document.addEventListener("visibilitychange", onVisible);
     window.addEventListener("online", onVisible);
     if (sock.connected) onConnect();
     return () => {
       sock.off("connect", onConnect); sock.off("disconnect", onDisconnect); sock.off("connect_error", onError);
       sock.off("room-session", onSession); sock.off("room-restored", onRestored);
+      sock.off("room-session-error", onSessionError); sock.off("room-kicked", onSessionError);
       document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("online", onVisible);
     };
   }, [resetRoom, showFeedback]);
@@ -1493,7 +1449,7 @@ export default function App() {
       if (!msg.system) showFeedback(msg.playerId === identity.current ? "Message sent." : `${msg.username}: ${msg.text}`, msg.playerId === identity.current ? "success" : "info");
     };
     const handleGameStartEvent = (data) => {
-      lastVoteNotice.current = "";
+      if (currentColorRound.current !== data.roundId) voteNotices.current.clear();
       currentColorRound.current = data.gameMode === "color-card" ? data.roundId : null;
       setRecoveryCategory(null);
       setGameState((prev) => ({ ...data, code: roomCode || prev?.code,
@@ -1532,7 +1488,7 @@ export default function App() {
       setGameState(null);
       setGameOverResult(null);
       setScreen("waiting");
-      setRoomPause(pausedAt ? { message: "Waiting for players to reconnect. The room is paused." } : null);
+      setRoomPause(null);
       if (!departure) { addSystemChat(message || "Rematch! Press Ready when you're set."); showFeedback(message || "Back in the waiting room. Ready for a rematch?"); }
     };
     const handlePlayerLeft = ({ playerId, username, message, disconnected }) => {
@@ -1558,8 +1514,8 @@ export default function App() {
         ...(typeof serverNow === "number" ? { serverClockOffset: serverNow - Date.now() } : {}),
       } : prev);
       const noticeId = `${vote.id}:${vote.status}`;
-      if (lastVoteNotice.current === noticeId) return;
-      lastVoteNotice.current = noticeId;
+      if (voteNotices.current.has(noticeId)) return;
+      voteNotices.current.add(noticeId);
       const messages = {
         active: "Everyone submitted! Vote to show results early. A majority of all players must vote Yes.",
         passed: "Skip vote passed! Revealing the results.",
@@ -1586,7 +1542,7 @@ export default function App() {
     };
     const handleRoomPaused = (data) => {
       if (data.code !== roomCode) return;
-      setRoomPause(data); setPlayers(data.players); roster.current = data.players;
+      setRoomPause({ ...data, serverClockOffset: (data.serverNow || Date.now()) - Date.now() }); setPlayers(data.players); roster.current = data.players;
       setGameState((previous) => previous ? { ...previous, pausedAt: data.pausedAt } : previous);
       setGameOverResult((previous) => previous ? { ...previous, pausedAt: data.pausedAt } : previous);
       showFeedback(data.message);
@@ -1595,6 +1551,11 @@ export default function App() {
       if (data.code !== roomCode) return;
       setRoomPause(null); setRestoring(false);
       showFeedback(data.message, "success");
+    };
+    const handleKickVotes = (data) => {
+      if (data.code !== roomCode) return;
+      setPlayers(data.players); roster.current = data.players;
+      setRoomPause((previous) => previous ? { ...previous, kickVotes: data.kickVotes, serverClockOffset: (data.serverNow || Date.now()) - Date.now() } : previous);
     };
 
     const notices = {
@@ -1627,6 +1588,7 @@ export default function App() {
     sock.on("player-left", handlePlayerLeft);
     sock.on("ROOM_PAUSED", handleRoomPaused);
     sock.on("ROOM_RESUMED", handleRoomResumed);
+    sock.on("ROOM_KICK_VOTES", handleKickVotes);
 
     return () => {
       Object.entries(notices).forEach(([event, handler]) => sock.off(event, handler));
@@ -1649,6 +1611,7 @@ export default function App() {
       sock.off("player-left", handlePlayerLeft);
       sock.off("ROOM_PAUSED", handleRoomPaused);
       sock.off("ROOM_RESUMED", handleRoomResumed);
+      sock.off("ROOM_KICK_VOTES", handleKickVotes);
     };
   }, [roomCode, addSystemChat, showFeedback]);
 
@@ -1749,17 +1712,20 @@ export default function App() {
 
   let currentView = null;
   if (screen === "lobby") currentView = <LobbyScreen onCreated={handleRoomCreated} onJoined={handleRoomJoined} connected={connected} gameMode={selectedMode} onModeChange={setSelectedMode} onFeedback={showFeedback} />;
-  else if (screen === "waiting") currentView = <WaitingScreen code={roomCode} players={players} myId={myId} gameMode={gameMode} maxPlayers={maxPlayers} colorDuration={colorDuration} onColorDurationChange={handleColorDurationChange} colorCardCount={colorCardCount} onColorCardCountChange={handleColorCardCountChange} gameLogs={gameLogs} chatMessages={chatMessages} onChat={handleChat} onGameStart={handleGameStart} turnDuration={turnDuration} roundLimit={roundLimit} isCreator={creatorId === myId} onTurnDurationChange={handleTurnDurationChange} onRoundLimitChange={handleRoundLimitChange} onFeedback={showFeedback} recoveryCategory={recoveryCategory} />;
+  else if (screen === "waiting") currentView = <WaitingScreen code={roomCode} players={players} myId={myId} gameMode={gameMode} maxPlayers={maxPlayers} colorDuration={colorDuration} onColorDurationChange={handleColorDurationChange} colorCardCount={colorCardCount} onColorCardCountChange={handleColorCardCountChange} gameLogs={gameLogs} onGameStart={handleGameStart} turnDuration={turnDuration} roundLimit={roundLimit} isCreator={creatorId === myId} onTurnDurationChange={handleTurnDurationChange} onRoundLimitChange={handleRoundLimitChange} onFeedback={showFeedback} recoveryCategory={recoveryCategory} />;
   else if (screen === "game" && gameState) currentView = gameMode === "color-card"
-    ? <ColorCardGameView key={gameState.roundId} gameState={gameState} socket={getSocket()} myId={myId} connected={connected} chatMessages={chatMessages} onChat={handleChat} onFeedback={showFeedback} />
-    : <GameScreen gameState={{ ...gameState, code: roomCode, turnDuration, roundLimit }} myId={myId} gameLogs={gameLogs} setGameLogs={setGameLogs} onGameOver={handleGameOver} onReturnToWaiting={handleReturnToWaiting} chatMessages={chatMessages} onChat={handleChat} onFeedback={showFeedback} />;
+    ? <ColorCardGameView key={gameState.roundId} gameState={gameState} socket={getSocket()} myId={myId} connected={connected} onFeedback={showFeedback} />
+    : <GameScreen gameState={{ ...gameState, code: roomCode, turnDuration, roundLimit }} myId={myId} gameLogs={gameLogs} setGameLogs={setGameLogs} onGameOver={handleGameOver} onReturnToWaiting={handleReturnToWaiting} onFeedback={showFeedback} />;
   else if (screen === "gameover" && gameOverResult) currentView = gameMode === "color-card"
-    ? <ColorCardResultsView key={`${gameOverResult.roundId}:${gameOverResult.phase}`} result={gameOverResult} myId={myId} connected={connected} onRematch={handleRematch} chatMessages={chatMessages} onChat={handleChat} onQuit={handleQuit} leaving={leaving} />
-    : <GameOverScreen result={gameOverResult} myId={myId} onRematch={handleRematch} chatMessages={chatMessages} onChat={handleChat} onQuit={handleQuit} leaving={leaving} />;
+    ? <ColorCardResultsView key={`${gameOverResult.roundId}:${gameOverResult.phase}`} result={gameOverResult} myId={myId} connected={connected} onRematch={handleRematch} onQuit={handleQuit} leaving={leaving} />
+    : <GameOverScreen result={gameOverResult} myId={myId} onRematch={handleRematch} onQuit={handleQuit} leaving={leaving} />;
   return (
-    <ExperienceShell screen={screen} code={roomCode} gameMode={gameMode} connected={connected} audioEnabled={audioEnabled} onAudioToggle={toggleSound} onShowRules={() => setShowRules(true)} toasts={toasts} onDismissToast={dismissToast} onQuit={handleQuit} leaving={leaving} roomPause={roomPause} restoring={restoring} onReconnect={() => { const sock = getSocket(); if (sock.connected) sock.emit("resume-room", readRoomSession(), (response) => { if (!response.success) { resetRoom(); showFeedback(response.message, "error"); } }); else sock.connect(); }}>
+    <>
+    <ExperienceShell players={players} myId={myId} onKickVote={(vote, choice) => getSocket().timeout(5000).emitWithAck("VOTE_ROOM_KICK", { code: roomCode, playerId: vote.playerId, voteId: vote.id, choice })} screen={screen} code={roomCode} gameMode={gameMode} connected={connected} audioEnabled={audioEnabled} onAudioToggle={toggleSound} onShowRules={() => setShowRules(true)} toasts={toasts} onDismissToast={dismissToast} onQuit={handleQuit} leaving={leaving} roomPause={roomPause} restoring={restoring} onReconnect={() => { const sock = getSocket(); if (sock.connected) sock.emit("resume-room", readRoomSession(), (response) => { if (!response.success) { resetRoom(); showFeedback(response.message, "error"); } }); else sock.connect(); }}>
       {currentView}
       {showRules && <RulesDialog gameMode={screen === "lobby" ? selectedMode : gameMode} onClose={() => setShowRules(false)} />}
     </ExperienceShell>
+    {roomCode && screen !== "lobby" && <RoomChat key={roomCode} messages={chatMessages} onSend={handleChat} myId={myId} colorRoundId={gameMode === "color-card" && screen === "game" ? gameState?.roundId : null} />}
+    </>
   );
 }

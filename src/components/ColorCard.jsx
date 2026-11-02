@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import FloatingChat from "./FloatingChat.jsx";
 import { ConfettiBurst } from "./Experience.jsx";
 import ColorSkipVote from "./ColorSkipVote.jsx";
 import ColorPodium from "./ColorPodium.jsx";
@@ -15,19 +14,6 @@ function ColorSwatch({ color, testId, label, detail, corner, progress, children,
     <div className="color-swatch-label"><span>{label}</span>{detail && <strong>{detail}</strong>}</div>
     {children}
   </div>;
-}
-
-function ColorChat({ messages, onChat, myId }) {
-  const [open, setOpen] = useState(false);
-  const [unread, setUnread] = useState(0);
-  const previousCount = useRef(messages.length);
-  useEffect(() => {
-    const added = messages.length - previousCount.current;
-    if (!open && added > 0) setUnread((value) => value + added);
-    if (added > 0 && messages.slice(-added).some((message) => !message.system && message.playerId !== myId)) SFX.chat();
-    previousCount.current = messages.length;
-  }, [messages, open, myId]);
-  return <FloatingChat messages={messages} onSend={(text) => { SFX.confirm(); onChat(text); }} myId={myId} isOpen={open} onToggle={() => { SFX.tap(); setOpen((value) => !value); setUnread(0); }} unread={unread} />;
 }
 
 function HsvControls({ hsv, onChange, disabled }) {
@@ -47,7 +33,7 @@ function HsvControls({ hsv, onChange, disabled }) {
   </fieldset>;
 }
 
-export function ColorCardGameView({ gameState, socket, myId, connected, chatMessages, onChat, onFeedback }) {
+export function ColorCardGameView({ gameState, socket, myId, connected, onFeedback }) {
   const [hsv, setHsv] = useState(() => gameState.myDraft ? hexToHsv(gameState.myDraft) : { h: 0, s: 0, v: 100 });
   const [hasPicked, setHasPicked] = useState(false);
   const [pending, setPending] = useState(false);
@@ -134,11 +120,11 @@ export function ColorCardGameView({ gameState, socket, myId, connected, chatMess
 
   const status = !connected ? "Disconnected from the server." : memorizing ? "Five seconds. One color. Trust your memory." : submitted ? "Answer submitted. Keep it, edit it, or vote when everyone is ready." : remaining === 0 ? "Time’s up. Everyone’s latest color is being submitted." : "Submit early, or keep mixing. Once everyone submits, a majority can skip to results.";
 
-  return <div className={`screen color-card-screen ${gameState.skipVote?.status === "active" ? "color-voting" : ""}`}>
+  return <div className="screen color-card-screen">
     <div className="page-intro"><div><span className="eyebrow">COLOR CARD · CARD {progress}</span><h1>{memorizing ? <>Remember this <span>color.</span></> : <>Match it from <span>memory.</span></>}</h1><p>{memorizing ? "Everyone sees this color. In five seconds, it’s just you and your memory." : "The original is hidden. Find the hue, then dial in saturation and brightness."}</p></div></div>
     <div className="color-round-status" role="status"><strong className={!memorizing && remaining <= 10 ? "color-time-urgent" : ""}>{memorizing ? "MEMORIZE" : `${remaining}s to match`}</strong><span>{gameState.submittedPlayerIds.length} / {gameState.players.length} answers submitted · everyone advances together</span></div>
     <TurnTimer className="color-timer" label={memorizing ? "Time to memorize" : "Time to match"} remaining={memorizing ? memorizeRemaining : remaining} total={memorizing ? 5 : gameState.roundDuration || 30} isMyTurn />
-    {!memorizing && gameState.skipVote && <ColorSkipVote key={gameState.skipVote.id} vote={gameState.skipVote} now={now} socket={socket} code={gameState.code} roundId={gameState.roundId} myId={myId} connected={connected} onFeedback={onFeedback} />}
+    {!memorizing && gameState.skipVote && <ColorSkipVote key={gameState.skipVote.id} vote={gameState.skipVote} now={now} socket={socket} code={gameState.code} roundId={gameState.roundId} myId={myId} connected={connected && !gameState.pausedAt} onFeedback={onFeedback} />}
     {memorizing ? <ColorSwatch color={gameState.targetColor} testId="target-color" className="color-memory-card" progress={progress} label="Memorize this color" corner={<div className="color-countdown" role="timer" aria-label={`${memorizeRemaining} seconds to memorize`}><strong>{memorizeRemaining}</strong><span>SECONDS</span></div>} />
       : <form className="color-picker-panel" onSubmit={submit}>
         <div className="color-selection-frame">
@@ -152,7 +138,6 @@ export function ColorCardGameView({ gameState, socket, myId, connected, chatMess
       </form>}
     {memorizing && <p className="color-memory-note" role="status">{status}</p>}
     <ul className="color-player-status" aria-label="Player submissions">{gameState.players.map((player) => <li key={player.id}><span>{player.username}{player.id === myId ? " (you)" : ""}</span><strong>{gameState.submittedPlayerIds.includes(player.id) || (player.id === myId && accepted) ? "Submitted" : memorizing ? "Memorizing…" : "Mixing…"}</strong></li>)}</ul>
-    <ColorChat messages={chatMessages} onChat={onChat} myId={myId} />
   </div>;
 }
 
@@ -171,7 +156,7 @@ function ResultCard({ entry, result, myId }) {
   </article>;
 }
 
-export function ColorCardResultsView({ result, myId, onRematch, connected, chatMessages, onChat, onQuit, leaving }) {
+export function ColorCardResultsView({ result, myId, onRematch, connected, onQuit, leaving }) {
   const reviewing = result.phase === "review";
   const isWinner = !reviewing && (result.matchComplete ? result.matchWinnerIds : result.winnerIds)?.includes(myId);
   const playedReveal = useRef(false);
@@ -206,6 +191,5 @@ export function ColorCardResultsView({ result, myId, onRematch, connected, chatM
       </li>)}</ol></div>}
     {!reviewing && result.standings?.length > 0 && <div className="color-standings"><h2>{result.matchComplete ? "Final standings" : "Match standings"}</h2><p>Average accuracy across {result.roundNumber} of {result.totalRounds} cards. Higher is better.</p><ol>{result.standings.map((player) => <li key={player.id}><span>{player.username}{player.id === myId ? " (you)" : ""}{result.matchWinnerIds?.includes(player.id) ? " · MATCH WINNER" : ""}</span><strong>{player.averageAccuracy.toFixed(2)}%</strong></li>)}</ol></div>}
     <div className="color-result-actions">{!reviewing && result.matchComplete && <button className="btn-fun btn-fun-yellow" onClick={() => { SFX.confirm(); onRematch(); }} disabled={!connected}>Play again</button>}<button className="btn-fun btn-fun-ghost" onClick={onQuit} disabled={leaving}>{leaving ? "Quitting…" : "Quit room"}</button></div>
-    <ColorChat messages={chatMessages} onChat={onChat} myId={myId} />
   </div>;
 }

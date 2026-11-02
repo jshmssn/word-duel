@@ -54,13 +54,13 @@ try {
   await host.getByTestId("character-knight").click();
   await expect(guest.getByTestId("character-knight")).toBeDisabled();
   await guest.getByTestId("character-wizard").click();
-  await expect(host.getByRole("button", { name: "Start Finish the Word" })).toBeDisabled();
+  await expect(host.getByRole("button", { name: "Start Finish the Word" })).toHaveCount(0);
   await host.getByRole("button", { name: "Ready up", exact: true }).click();
   await guest.getByRole("button", { name: "Ready up", exact: true }).click();
-  await expect(host.getByRole("button", { name: "Start Finish the Word" })).toBeEnabled();
-  await host.getByRole("button", { name: "Start Finish the Word" }).click();
+  await expect(host.locator(".countdown-overlay")).toBeVisible();
   const hostInput = host.getByRole("textbox", { name: "Your word" });
   const guestInput = guest.getByRole("textbox", { name: "Your word" });
+  await expect(hostInput).toBeVisible({ timeout: 12000 });
   await expect.poll(async () => await hostInput.isEnabled() || await guestInput.isEnabled()).toBe(true);
   const first = await hostInput.isEnabled() ? host : guest;
   const second = first === host ? guest : host;
@@ -82,6 +82,8 @@ try {
   await second.getByRole("button", { name: "Submit word", exact: true }).click();
   await expect(secondInput).toBeEnabled();
   await expect(second.locator("#finish-word-input-error")).toContainText("Try again");
+  await expect(secondInput).toHaveValue("");
+  await expect(first.getByTestId("live-word-bubble")).toContainText("Thinking");
   await expect(firstInput).toBeDisabled();
   await expect(first.getByRole("article", { name: `${secondName}, 3 lives, current turn`, exact: true })).toHaveCount(1);
   const nextWord = vocabulary.find((candidate) => candidate !== word && candidate.startsWith(word.slice(-1)));

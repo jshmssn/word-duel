@@ -35,10 +35,10 @@ test("Finish the Word is discoverable with its own preview, room option and inst
   await expect(rules).toContainText("three hearts");
 });
 
-test("lobby selection locks characters and everyone must ready up before the host starts", async ({ page }) => {
+test("lobby selection locks characters and everyone must ready up for automatic countdown", async ({ page }) => {
   const unselected = roster.map((player) => ({ ...player, characterId: null }));
   await receive(page, "room-created", { ...finishRoom, players: unselected });
-  await expect(page.getByRole("button", { name: "Start Finish the Word" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Start Finish the Word" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Ready up", exact: true })).toBeDisabled();
   await page.getByTestId("character-knight").click();
   expect(await page.evaluate(() => window.testSocket.sent.find((entry) => entry.event === "select_character")?.data)).toEqual({ code: room.code, characterId: "knight" });
@@ -47,7 +47,7 @@ test("lobby selection locks characters and everyone must ready up before the hos
   await expect(page.getByTestId("character-knight")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("character-wizard")).toBeDisabled();
   await expect(page.getByTestId("character-wizard")).toContainText(roster[1].username);
-  await expect(page.getByRole("button", { name: "Start Finish the Word" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Start Finish the Word" })).toHaveCount(0);
   await page.getByRole("button", { name: "Ready up", exact: true }).click();
   expect(await page.evaluate(() => window.testSocket.sent.find((entry) => entry.event === "toggle-ready")?.data)).toEqual({ code: room.code });
   await expect(page.getByRole("button", { name: "Updating…", exact: true })).toBeDisabled();
@@ -55,20 +55,24 @@ test("lobby selection locks characters and everyone must ready up before the hos
   const readyRoster = roster.map((player) => ({ ...player, ready: true }));
   await receive(page, "ready-update", { ...finishRoom, players: readyRoster, changedPlayerId: roster[0].id });
   await expect(page.getByRole("button", { name: "Not ready", exact: true })).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "Start Finish the Word" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Start Finish the Word" })).toHaveCount(0);
   await page.getByRole("button", { name: "Not ready", exact: true }).click();
   await page.evaluate(() => window.testSocket.acknowledge("toggle-ready", { success: true, ready: false }));
   await receive(page, "ready-update", { ...finishRoom, players: roster, changedPlayerId: roster[0].id });
-  await expect(page.getByRole("button", { name: "Start Finish the Word" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Start Finish the Word" })).toHaveCount(0);
   await page.getByTestId("character-robot").click();
   await page.evaluate(() => window.testSocket.acknowledge("select_character", { success: true }));
   await receive(page, "character_selected", { ...finishRoom, players: [{ ...roster[0], characterId: "robot" }, roster[1]] });
   await expect(page.getByTestId("character-knight")).toBeEnabled();
   await expect(page.getByTestId("character-robot")).toHaveAttribute("aria-pressed", "true");
-  await expect(page.getByRole("button", { name: "Start Finish the Word" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Start Finish the Word" })).toHaveCount(0);
   await receive(page, "ready-update", { ...finishRoom, players: [{ ...readyRoster[0], characterId: "robot" }, readyRoster[1]] });
-  await page.getByRole("button", { name: "Start Finish the Word" }).click();
-  expect(await page.evaluate(() => window.testSocket.sent.filter((entry) => entry.event === "start_game").map((entry) => entry.data))).toEqual([{ code: room.code }]);
+  await receive(page, "countdown", { count: 5 });
+  await expect(page.locator(".countdown-overlay")).toContainText("FINISH THE WORD STARTING");
+  await expect(page.locator(".countdown-num")).toHaveText("5");
+  await receive(page, "countdown-cancel", {});
+  await expect(page.locator(".countdown-overlay")).toHaveCount(0);
+  expect(await page.evaluate(() => window.testSocket.sent.some((entry) => entry.event === "start_game"))).toBe(false);
 });
 
 test("guests can ready and unready and see the other players' readiness", async ({ page }) => {
@@ -78,7 +82,7 @@ test("guests can ready and unready and see the other players' readiness", async 
   await page.getByRole("button", { name: "Ready up", exact: true }).click();
   await page.evaluate(() => window.testSocket.acknowledge("toggle-ready", { success: true, ready: true }));
   await receive(page, "ready-update", { ...guestRoom, players: [{ ...roster[0], ready: true }, roster[1]], changedPlayerId: roster[0].id });
-  await expect(page.getByRole("status").filter({ hasText: "Waiting for the host" })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: "Waiting for everyone else" })).toBeVisible();
   await expect(page.locator(".finish-word-ready-status.ready")).toHaveCount(1);
   await page.getByRole("button", { name: "Not ready", exact: true }).click();
   await page.evaluate(() => window.testSocket.acknowledge("toggle-ready", { success: true, ready: false }));
@@ -102,15 +106,15 @@ for (const reducedMotion of ["no-preference", "reduce"]) {
     });
     const input = page.getByRole("textbox", { name: "Your word" });
     await page.clock.fastForward(3000);
-    await input.fill("azzzz");
     for (let attempt = 1; attempt <= 2; attempt++) {
+      await input.fill("azzzz");
       await input.press("Enter");
       await page.evaluate(() => window.testSocket.acknowledge("submit_word", {
         success: true, accepted: false, retryable: true, reason: "not_in_dictionary", message: "That word is not in the dictionary.",
       }));
       await expect(input).toBeEnabled();
       await expect(input).toBeFocused();
-      await expect(input).toHaveValue("azzzz");
+      await expect(input).toHaveValue("");
       await expect(input).toHaveAttribute("aria-invalid", "true");
       await expect(page.locator("#finish-word-input-error")).toContainText("Try again before time runs out.");
       await expect.poll(() => page.evaluate(() => window.wrongSounds)).toBe(attempt);
@@ -199,6 +203,29 @@ test("opening a phone keyboard keeps the prefix visible and the active character
   await page.screenshot({ path: "test-results/finish-word-mobile-keyboard.png", animations: "disabled" });
 });
 
+for (const [height, visibleHeight] of [[844, 844], [568, 568], [844, 380], [844, 300]]) {
+  test(`mobile toasts stay below the timer, prefix and word input at ${height}/${visibleHeight}px`, async ({ page }) => {
+    await page.setViewportSize({ width: 390, height });
+    const state = await start(page, { requiredPrefix: "le", hardMode: true });
+    if (visibleHeight !== height) await page.evaluate((value) => {
+      Object.defineProperty(window.visualViewport, "height", { configurable: true, get: () => value });
+      window.visualViewport.dispatchEvent(new Event("resize"));
+    }, visibleHeight);
+    await receive(page, "word_rejected", { code: room.code, gameId: state.gameId, playerId: roster[0].id,
+      accepted: false, retryable: true, message: "That word is invalid. Try another word before time runs out." });
+    const toast = page.locator(".toast-mobile-bottom .feedback-toast");
+    await expect(toast).toHaveCount(1);
+    const frame = await toast.boundingBox();
+    expect(frame.y + frame.height).toBeLessThanOrEqual(visibleHeight);
+    for (const target of [page.getByRole("timer"), page.getByTestId("required-prefix"), page.getByRole("textbox", { name: "Your word" })]) {
+      const control = await target.boundingBox();
+      expect(frame.x < control.x + control.width && frame.x + frame.width > control.x &&
+        frame.y < control.y + control.height && frame.y + frame.height > control.y).toBe(false);
+    }
+    if (visibleHeight === 380) await page.screenshot({ path: "test-results/finish-word-mobile-toast.png", animations: "disabled" });
+  });
+}
+
 test("hard mode, heart loss, elimination, results and rematch use authoritative snapshots", async ({ page }) => {
   const state = await start(page, { requiredPrefix: "le", hardMode: true, successfulTurns: 10, lastWord: "apple" });
   await expect(page.getByTestId("required-prefix")).toHaveText("LE");
@@ -216,7 +243,7 @@ test("hard mode, heart loss, elimination, results and rematch use authoritative 
   await page.getByRole("button", { name: /Back to character lobby/ }).click();
   expect(await page.evaluate(() => window.testSocket.sent.some((entry) => entry.event === "rematch"))).toBe(true);
   await receive(page, "rematch-lobby", finishRoom);
-  await expect(page.getByRole("button", { name: "Start Finish the Word" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Start Finish the Word" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Ready up", exact: true })).toBeEnabled();
 });
 

@@ -102,6 +102,7 @@ export default function useFinishWord({ gameState, socket, myId, connected, onFe
         const message = response?.message || "Could not submit your word.";
         setError(message); onFeedback(message, "error");
       } else if (response.accepted === false && response.retryable) {
+        setWord(""); latestTyping.current = "";
         setError(`${response.message} Try again before time runs out.`);
         setRejectedAttempts((count) => count + 1);
         SFX.wrong();

@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import useFinishWord from "../hooks/useFinishWord.js";
 import useVisualViewport from "../hooks/useVisualViewport.js";
+import ModalOverlay from "./ModalOverlay.jsx";
 import "./FinishWord.css";
 
 export const FINISH_WORD_CHARACTERS = Object.freeze([
@@ -108,11 +109,20 @@ export function FinishWordHearts({ lives = 3, className = "" }) {
 export function FinishWordLobby({ code, players, myId, creatorId, maxPlayers = 8, socket, connected, onFeedback }) {
   const [pending, setPending] = useState(null);
   const [error, setError] = useState("");
+  const [countdown, setCountdown] = useState(null);
   const activeRequest = useRef(false);
-  const isHost = creatorId === myId;
   const me = players.find((player) => player.id === myId);
-  const canStart = connected && players.length >= 2 && players.length <= maxPlayers &&
+  const allReady = connected && players.length >= 2 && players.length <= maxPlayers &&
     players.every((player) => player.ready && player.characterId && player.connected !== false);
+
+  useEffect(() => {
+    const update = ({ count }) => setCountdown(count);
+    const cancel = () => setCountdown(null);
+    socket.on("countdown", update); socket.on("countdown-cancel", cancel);
+    return () => { socket.off("countdown", update); socket.off("countdown-cancel", cancel); };
+  }, [socket]);
+
+  useEffect(() => { if (!allReady) setCountdown(null); }, [allReady]);
 
   async function act(event, data, key) {
     if (!connected || activeRequest.current) return;
@@ -158,11 +168,11 @@ export function FinishWordLobby({ code, players, myId, creatorId, maxPlayers = 8
           {player.id === creatorId && <span className="finish-word-host-tag">HOST</span>}
         </li>)}</ul></section>
         <section className="finish-word-briefing"><span className="eyebrow">THE RULES ARE SIMPLE</span><h2>Keep the word alive.</h2><div><strong>15s</strong><p>to find a valid word on your turn</p></div><div><FinishWordHearts lives={3} /><p>Only a timeout costs one life. Invalid word? Try again while time remains.</p></div><p>Start with the last letter. After 10 accepted words, match the last <strong>two</strong>. Every word can be used once.</p><p>Last player standing wins.</p></section>
-        <button type="button" className={`btn-fun ${me?.ready ? "btn-fun-ghost" : "btn-fun-green"} finish-word-ready-button`} aria-pressed={Boolean(me?.ready)} disabled={!connected || !me?.characterId || pending !== null} onClick={() => act("toggle-ready", {}, "ready")}>{pending === "ready" ? "Updating…" : me?.ready ? "Not ready" : "Ready up"}</button>
-        {isHost ? <button type="button" className="btn-fun btn-fun-yellow finish-word-start" disabled={!canStart || pending !== null} onClick={() => act("start_game", {}, "start")}>{pending === "start" ? "Starting…" : "Start Finish the Word"}<span aria-hidden="true">→</span></button> : <p className="finish-word-lobby-wait" role="status">{!me?.characterId ? "Choose a character, then ready up." : me.ready ? "You're ready. Waiting for the host to start." : "Ready up when you're set to play."}</p>}
-        {isHost && !canStart && <p className="finish-word-lobby-wait">{players.length < 2 ? "Invite at least one other player to start." : "Everyone must choose a character, ready up, and be connected."}</p>}
+        <button type="button" className={`btn-ready-fun ${me?.ready ? "is-ready" : "not-ready"} finish-word-ready-button`} aria-pressed={Boolean(me?.ready)} disabled={!connected || !me?.characterId || pending !== null} onClick={() => act("toggle-ready", {}, "ready")}>{pending === "ready" ? "Updating…" : me?.ready ? "Not ready" : "Ready up"}</button>
+        <p className="finish-word-lobby-wait" role="status">{players.length < 2 ? "Invite at least one other player to start." : !me?.characterId ? "Choose a character, then ready up." : allReady ? "Everyone is ready. The game starts automatically!" : me.ready ? "You're ready. Waiting for everyone else to ready up." : "Everyone must choose a character and ready up. The game starts automatically."}</p>
       </aside>
     </div>
+    {countdown !== null && <ModalOverlay className="countdown-overlay" role="status"><div className="countdown-card"><span className="eyebrow">GET READY</span><div className="countdown-num" key={countdown}>{countdown}</div><div className="countdown-label-fun">FINISH THE WORD STARTING</div></div></ModalOverlay>}
   </div>;
 }
 

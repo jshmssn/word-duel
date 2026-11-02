@@ -67,16 +67,17 @@ export function ExperienceShell({ children, screen, code, gameMode, connected, a
         <span>{title} <span className="footer-cross">✦</span> THINK. PLAY. CONNECT.</span>
         <span>PLAY TOGETHER, ANYWHERE</span>
       </footer>
-      <Toast toasts={toasts} onDismiss={onDismissToast} />
+      <Toast toasts={toasts} onDismiss={onDismissToast} mobileBottom={inGame && gameMode === "finish-word"} />
     </div>
   );
 }
 
-export function Toast({ toasts = [], onDismiss }) {
+export function Toast({ toasts = [], onDismiss, mobileBottom = false }) {
   const viewport = useVisualViewport();
-  const visibleToasts = toasts.slice(-(viewport?.height < 300 ? 1 : viewport?.height < 500 ? 2 : 4));
+  const atBottom = mobileBottom && window.matchMedia("(max-width: 680px)").matches;
+  const visibleToasts = toasts.slice(-(atBottom || viewport?.height < 300 ? 1 : viewport?.height < 500 ? 2 : 4));
   return (
-    <div className="toast-layer" role="status" aria-live="polite" aria-relevant="additions" style={viewport ? { "--toast-offset": `${viewport.offsetTop}px` } : undefined}>
+    <div className={`toast-layer ${atBottom ? "toast-mobile-bottom" : ""}`} role="status" aria-live="polite" aria-relevant="additions" style={viewport ? { "--toast-offset": `${viewport.offsetTop}px`, "--toast-bottom": `${viewport.bottom}px` } : undefined}>
       {visibleToasts.map((toast) => (
         <div key={toast.id} className={`feedback-toast toast-${toast.tone || "info"}`}>
           <span className="toast-symbol" aria-hidden="true">{toast.tone === "success" ? "✦" : toast.tone === "error" ? "!" : "↗"}</span>
@@ -117,9 +118,9 @@ export function RulesDialog({ onClose, gameMode = "word-duel" }) {
         <h2 id="rules-heading">{isFinishWord ? <>Last letter. Next word.<br /><span>Stay in the chain.</span></> : isColorCard ? <>One target. Your color.<br /><span>Closest match wins.</span></> : <>Secret words. Sharp minds.<br /><span>Crack the code first.</span></>}</h2>
         <div className="rules-steps">
           {isFinishWord ? <>
-            <div><span className="rule-number">01</span><div className="rule-icon"><IconShield size={21} color="currentColor" /></div><div><h3>Choose your character</h3><p>Pick one of eight exclusive characters, then ready up. Once everyone is ready, the host can start with 2 to 8 players. The first player is chosen at random. Each player begins with three hearts.</p></div></div>
+            <div><span className="rule-number">01</span><div className="rule-icon"><IconShield size={21} color="currentColor" /></div><div><h3>Choose your character</h3><p>Pick one of eight exclusive characters, then ready up. Once all 2 to 8 players are ready, a five-second countdown starts the game automatically. The first player is chosen at random. Each player begins with three hearts.</p></div></div>
             <div><span className="rule-number">02</span><div className="rule-icon"><IconClock size={21} color="currentColor" /></div><div><h3>Fifteen seconds. One word.</h3><p>On your turn, enter an English word of at least two letters starting with the displayed letter. Each accepted word passes its last letter to the next player. A word can only be used once per match. Everyone can see what you type.</p></div></div>
-            <div><span className="rule-number">03</span><div className="rule-icon"><IconLightning size={21} color="currentColor" /></div><div><h3>Keep your hearts</h3><p>Only a timeout costs one heart and passes the turn. Invalid words can be corrected while time remains. After ten accepted words, the chain uses the last two letters. Keep your hearts until one player remains.</p></div></div>
+            <div><span className="rule-number">03</span><div className="rule-icon"><IconLightning size={21} color="currentColor" /></div><div><h3>Keep your hearts</h3><p>Only a timeout costs one heart and passes the turn. Invalid words clear the input so you can try again while time remains. After ten accepted words, the chain uses the last two letters. If everyone times out, new starting letters keep the game moving. Keep your hearts until one player remains.</p></div></div>
           </> : isColorCard ? <>
             <div><span className="rule-number">01</span><div className="rule-icon"><IconTarget size={21} color="currentColor" /></div><div><h3>Shared colors, one memory</h3><p>The host chooses the card count and answer time. Each card has a unique random color, shared with everyone for 5 seconds before it disappears.</p></div></div>
             <div><span className="rule-number">02</span><div className="rule-icon"><IconClock size={21} color="currentColor" /></div><div><h3>Mix, submit, or edit</h3><p>Use hue, saturation, and brightness to color your blank card. The host chooses 30, 45, or 60 seconds. If everyone submits with at least 20 seconds left, a vote opens to reveal results early. More than half of all players must vote Yes; voting closes 10 seconds before the answer timer. Editing cancels the vote.</p></div></div>

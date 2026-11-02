@@ -13,6 +13,8 @@
 .toast-layer { top: calc(var(--toast-offset, 0px) + 76px); bottom: auto; left: auto; right: max(16px, env(safe-area-inset-right)); transform: none; width: min(370px, calc(100vw - 32px)); gap: 8px; align-items: start; }
 .feedback-toast { width: 100%; padding: 6px 6px 6px 14px; pointer-events: none; backdrop-filter: blur(16px); }
 .feedback-toast > span:nth-child(2) { flex: 1; min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.toast-layer.toast-mobile-bottom { top: auto; bottom: calc(var(--toast-bottom, 0px) + max(12px, env(safe-area-inset-bottom, 0px))); left: 12px; right: auto; width: calc(100vw - 88px); transform: none; }
+.toast-mobile-bottom .feedback-toast { font-size: 11px; gap: 6px; }
 .toast-dismiss { display: grid; place-items: center; flex: none; border: 0; background: transparent; border-radius: 8px; width: 44px; height: 44px; color: inherit; opacity: .75; pointer-events: auto; }
 .toast-dismiss:hover { opacity: 1; background: #ffffff12; }
 .mode-discovery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 26px; }

@@ -10,6 +10,7 @@ import useToasts from "./hooks/useToasts.js";
 import { readRoomSession, saveRoomSession, clearRoomSession } from "./roomSession.js";
 import ModalOverlay from "./components/ModalOverlay.jsx";
 import { ColorCardGameView, ColorCardResultsView } from "./components/ColorCard.jsx";
+import { FinishWordLobby, FinishWordGameView } from "./components/FinishWord.jsx";
 import {
   IconSword,
   IconShield,
@@ -199,6 +200,7 @@ function LobbyScreen({ onCreated, onJoined, connected, gameMode, onModeChange, o
   };
 
   const isColorCard = gameMode === "color-card";
+  const isFinishWord = gameMode === "finish-word";
 
   return (
     <div className="screen lobby-screen">
@@ -206,16 +208,17 @@ function LobbyScreen({ onCreated, onJoined, connected, gameMode, onModeChange, o
         <section className="hero-panel">
           <div className="hero-eyebrow"><span className="eyebrow-line" /> GAMIFYLUV · PLAY TOGETHER <span className="eyebrow-spark">✦</span></div>
           <div className="mode-discovery" aria-label="Explore game modes">
-            <button type="button" className={isColorCard ? "" : "selected"} aria-pressed={!isColorCard} onClick={() => onModeChange("word-duel")}><IconSword size={20} color="currentColor" /><span><strong>Word Duel</strong><small>Ask. Deduce. Outspell.</small></span></button>
+            <button type="button" className={gameMode === "word-duel" ? "selected" : ""} aria-pressed={gameMode === "word-duel"} onClick={() => onModeChange("word-duel")}><IconSword size={20} color="currentColor" /><span><strong>Word Duel</strong><small>Ask. Deduce. Outspell.</small></span></button>
             <button type="button" className={isColorCard ? "selected" : ""} aria-pressed={isColorCard} onClick={() => onModeChange("color-card")}><span className="color-mode-icon" aria-hidden="true" /><span><strong>Color Card</strong><small>Remember. Mix. Match.</small></span></button>
+            <button type="button" className={isFinishWord ? "selected" : ""} aria-pressed={isFinishWord} onClick={() => onModeChange("finish-word")}><IconLetters size={20} color="currentColor" /><span><strong>Finish the Word</strong><small>Link. Survive. Win.</small></span></button>
           </div>
           <h1 className="hero-headline">YOUR PEOPLE.<br /><span>YOUR PLAYGROUND.</span></h1>
-          <p className="platform-description">Crack secret words in <strong>Word Duel</strong> or test your color memory in <strong>Color Card</strong>. Two ways to challenge your friends. One place to play.</p>
+          <p className="platform-description">Crack secret words in <strong>Word Duel</strong>, test your memory in <strong>Color Card</strong>, or outlast your friends in <strong>Finish the Word</strong>. Pick your next challenge.</p>
           <div key={gameMode} className="mode-hero-copy">
-          <h2 className="mode-preview-heading">{isColorCard ? "Color Card · Trust your color memory." : "Word Duel · Words are your weapon."}</h2>
-          <p className="hero-description">{isColorCard ? "Five seconds to remember a color. One blank card to recreate it. Mix your best match and climb the rankings with up to eight friends." : "A secret word. A room full of rivals. Ask about letters, piece together your clues, and crack the next player’s word before they crack yours."}</p>
-          <div className="hero-tags"><span><IconLightning size={15} color="currentColor" /> 2–8 PLAYER ROOMS</span><span><IconTarget size={15} color="currentColor" /> {isColorCard ? "5-SECOND MEMORY TEST" : "SOLO BOT PRACTICE"}</span><span><IconTrophy size={15} color="currentColor" /> {isColorCard ? "CLOSEST COLOR WINS" : "BEST OF 3 OR 5"}</span></div>
-          {isColorCard ? <div className="arena-preview color-arena-preview" aria-label="A sample color memory challenge"><div className="preview-top"><span className="preview-pill"><span className="connection-dot" /> COLOR CARD</span><span className="preview-subtitle">REMEMBER THE SHADE</span></div><div className="color-demo-cards"><div className="color-demo-original"><span>THE ORIGINAL</span><strong>05<small>SECONDS TO REMEMBER</small></strong></div><div className="color-demo-match"><span>YOUR MATCH</span><strong>98.6%<small>HOW CLOSE CAN YOU GET?</small></strong></div></div><div className="preview-foot"><span>✦ Memorize → Mix → Compare</span><span>PLAY IN FULL COLOR</span></div></div> : <div className="arena-preview" aria-label="A sample letter puzzle">
+          <h2 className="mode-preview-heading">{isFinishWord ? "Finish the Word / Keep the chain alive." : isColorCard ? "Color Card · Trust your color memory." : "Word Duel · Words are your weapon."}</h2>
+          <p className="hero-description">{isFinishWord ? "Eight characters. Three hearts. Ten seconds to find your next word. Follow the last letter, watch your rivals type, and be the last player standing." : isColorCard ? "Five seconds to remember a color. One blank card to recreate it. Mix your best match and climb the rankings with up to eight friends." : "A secret word. A room full of rivals. Ask about letters, piece together your clues, and crack the next player’s word before they crack yours."}</p>
+          <div className="hero-tags"><span><IconLightning size={15} color="currentColor" /> 2–8 PLAYER ROOMS</span><span><IconTarget size={15} color="currentColor" /> {isFinishWord ? "10-SECOND TURNS" : isColorCard ? "5-SECOND MEMORY TEST" : "SOLO BOT PRACTICE"}</span><span><IconTrophy size={15} color="currentColor" /> {isFinishWord ? "LAST PLAYER STANDING" : isColorCard ? "CLOSEST COLOR WINS" : "BEST OF 3 OR 5"}</span></div>
+          {isFinishWord ? <div className="arena-preview finish-word-preview" aria-label="A sample word chain"><div className="preview-top"><span className="preview-pill">FINISH THE WORD</span><span className="preview-subtitle">THREE HEARTS. ONE CHAIN.</span></div><div className="finish-word-demo-chain"><span>APPL<strong>E</strong></span><span aria-hidden="true">&rarr;</span><span><strong>E</strong>LEPHAN<strong>T</strong></span><span aria-hidden="true">&rarr;</span><span><strong>T</strong>URTLE</span></div><div className="preview-foot"><span>Choose a character. Make your move.</span><span>10 SECONDS</span></div></div> : isColorCard ? <div className="arena-preview color-arena-preview" aria-label="A sample color memory challenge"><div className="preview-top"><span className="preview-pill"><span className="connection-dot" /> COLOR CARD</span><span className="preview-subtitle">REMEMBER THE SHADE</span></div><div className="color-demo-cards"><div className="color-demo-original"><span>THE ORIGINAL</span><strong>05<small>SECONDS TO REMEMBER</small></strong></div><div className="color-demo-match"><span>YOUR MATCH</span><strong>98.6%<small>HOW CLOSE CAN YOU GET?</small></strong></div></div><div className="preview-foot"><span>✦ Memorize → Mix → Compare</span><span>PLAY IN FULL COLOR</span></div></div> : <div className="arena-preview" aria-label="A sample letter puzzle">
             <div className="preview-top"><span className="preview-pill"><span className="connection-dot" /> ROUND IN PROGRESS</span><span className="preview-subtitle">YOUR CLUE BOARD <span aria-hidden="true">↗</span></span></div>
             <div className="preview-matchup"><div className="preview-player"><span className="preview-avatar preview-you">Y</span><span>YOU <small>DETECTIVE</small></span></div><div className="preview-versus">VS</div><div className="preview-player right"><span>RIVAL <small>WORD KEEPER</small></span><span className="preview-avatar preview-rival">R</span></div></div>
             <div className="preview-letter-label"><span>UNPOSITIONED CLUES</span><span>2 / 6 LETTERS FOUND</span></div>
@@ -238,14 +241,14 @@ function LobbyScreen({ onCreated, onJoined, connected, gameMode, onModeChange, o
               <button type="button" role="tab" aria-selected={tab === "join"} className={`tab-pill ${tab === "join" ? "active" : ""}`} onClick={() => {setTab("join"); setError("");}}><IconRocket size={17} color="currentColor" /> Join room</button>
             </div>
             {tab === "create" && <div className="create-room-settings">
-              <label className="field-group" htmlFor="room-game-mode"><span className="field-label">GAME MODE</span><select id="room-game-mode" className="fun-input timer-select" value={gameMode} onChange={(event) => onModeChange(event.target.value)}><option value="word-duel">Word Duel</option><option value="color-card">Color Card</option></select></label>
+              <label className="field-group" htmlFor="room-game-mode"><span className="field-label">GAME MODE</span><select id="room-game-mode" className="fun-input timer-select" value={gameMode} onChange={(event) => onModeChange(event.target.value)}><option value="word-duel">Word Duel</option><option value="color-card">Color Card</option><option value="finish-word">Finish the Word</option></select></label>
               <label className="field-group" htmlFor="room-max-players"><span className="field-label">MAX NUMBER OF PLAYERS</span><select id="room-max-players" className="fun-input timer-select" value={maxPlayers} onChange={(event) => setMaxPlayers(Number(event.target.value))}>{Array.from({ length: 7 }, (_, index) => index + 2).map((count) => <option key={count} value={count}>{count} players</option>)}</select></label>
               {gameMode === "color-card" && <ColorCardSettings duration={colorDuration} count={colorCardCount} onDurationChange={setColorDuration} onCountChange={setColorCardCount} />}
             </div>}
             {tab === "join" && <label className="field-group enter-from-right" htmlFor="room-join-code"><span className="field-label">8-CHARACTER ROOM CODE</span><input id="room-join-code" autoCapitalize="characters" autoCorrect="off" spellCheck={false} enterKeyHint="go" className="fun-input code-input-fun" value={joinCode} onChange={(e) => { setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "")); setError(""); }} onKeyDown={(e) => e.key === "Enter" && handleJoin()} placeholder="ENTER CODE" maxLength={8} /></label>}
             {error && <div className="error-bubble" role="alert"><IconWarning size={16} color="currentColor" /> {error}</div>}
             {!connected && !error && <div className="connection-notice" role="status">Connecting to game server…</div>}
-            {tab === "create" ? <div className="create-actions"><button className="btn-fun btn-fun-yellow" onClick={handleCreate} disabled={loading || !connected}><span className="btn-icon-row"><IconLightning size={19} color="currentColor" /> {loading ? "Opening arena…" : gameMode === "word-duel" ? "Create a duel" : "Create Color Card room"} <span className="action-arrow">↗</span></span></button>{gameMode === "word-duel" && <button className="btn-fun btn-fun-ghost" onClick={handleCreateBotRoom} disabled={loading || !connected}><span className="btn-icon-row"><IconTarget size={19} color="currentColor" /> Practice vs bot (2 players) <span className="action-arrow">→</span></span></button>}</div> : <button className="btn-fun btn-fun-yellow" onClick={handleJoin} disabled={loading || !connected}><span className="btn-icon-row"><IconRocket size={18} color="currentColor" /> {loading ? "Finding room…" : "Join room"} <span className="action-arrow">↗</span></span></button>}
+            {tab === "create" ? <div className="create-actions"><button className="btn-fun btn-fun-yellow" onClick={handleCreate} disabled={loading || !connected}><span className="btn-icon-row"><IconLightning size={19} color="currentColor" /> {loading ? "Opening arena…" : gameMode === "word-duel" ? "Create a duel" : gameMode === "finish-word" ? "Create Finish the Word room" : "Create Color Card room"} <span className="action-arrow">↗</span></span></button>{gameMode === "word-duel" && <button className="btn-fun btn-fun-ghost" onClick={handleCreateBotRoom} disabled={loading || !connected}><span className="btn-icon-row"><IconTarget size={19} color="currentColor" /> Practice vs bot (2 players) <span className="action-arrow">→</span></span></button>}</div> : <button className="btn-fun btn-fun-yellow" onClick={handleJoin} disabled={loading || !connected}><span className="btn-icon-row"><IconRocket size={18} color="currentColor" /> {loading ? "Finding room…" : "Join room"} <span className="action-arrow">↗</span></span></button>}
           </div>
           <div className="entry-bottom"><span className="entry-star">✦</span><div><strong>{isColorCard ? "A LITTLE MEMORY. A LOT OF COLOR." : "THINK QUICK. SPELL FASTER."}</strong><p>{isColorCard ? "No sign-up required. Invite friends and compare your colors." : "No sign-up required. Invite a friend or face a bot."}</p></div></div>
         </section>
@@ -1552,6 +1555,32 @@ export default function App() {
       setRoomPause(null); setRestoring(false);
       showFeedback(data.message, "success");
     };
+    const handleFinishState = (state) => {
+      if (state.code !== roomCode || state.gameMode !== "finish-word") return;
+      const synchronized = { ...state, serverClockOffset: (state.serverNow || Date.now()) - Date.now() };
+      setGameMode("finish-word");
+      setPlayers(state.players); roster.current = state.players;
+      setRecoveryCategory(null);
+      if (state.status === "ENDED") {
+        setGameOverResult(synchronized); setScreen("gameover");
+      } else {
+        setGameState(synchronized); setGameOverResult(null); setScreen("game");
+      }
+    };
+    const handleCharacterSelected = (state) => {
+      if (state.code !== roomCode) return;
+      roster.current = state.players; setPlayers(state.players);
+      if (state.creatorId) setCreatorId(state.creatorId);
+    };
+    const handleFinishTyping = ({ code, gameId, turnId, playerId, text }) => {
+      if (code !== roomCode) return;
+      setGameState((previous) => previous?.gameMode === "finish-word" && previous.gameId === gameId && previous.turnId === turnId && previous.currentPlayerId === playerId
+        ? { ...previous, typingText: text } : previous);
+    };
+    const handleFinishWord = ({ code, message, accepted, playerId }) => {
+      if (code !== roomCode) return;
+      if (message) showFeedback(message, accepted ? "success" : playerId === identity.current ? "error" : "info");
+    };
     const handleKickVotes = (data) => {
       if (data.code !== roomCode) return;
       setPlayers(data.players); roster.current = data.players;
@@ -1589,6 +1618,13 @@ export default function App() {
     sock.on("ROOM_PAUSED", handleRoomPaused);
     sock.on("ROOM_RESUMED", handleRoomResumed);
     sock.on("ROOM_KICK_VOTES", handleKickVotes);
+    sock.on("character_selected", handleCharacterSelected);
+    sock.on("turn_start", handleFinishState);
+    sock.on("game_state", handleFinishState);
+    sock.on("game_over", handleFinishState);
+    sock.on("player_typing", handleFinishTyping);
+    sock.on("word_accepted", handleFinishWord);
+    sock.on("word_rejected", handleFinishWord);
 
     return () => {
       Object.entries(notices).forEach(([event, handler]) => sock.off(event, handler));
@@ -1612,6 +1648,13 @@ export default function App() {
       sock.off("ROOM_PAUSED", handleRoomPaused);
       sock.off("ROOM_RESUMED", handleRoomResumed);
       sock.off("ROOM_KICK_VOTES", handleKickVotes);
+      sock.off("character_selected", handleCharacterSelected);
+      sock.off("turn_start", handleFinishState);
+      sock.off("game_state", handleFinishState);
+      sock.off("game_over", handleFinishState);
+      sock.off("player_typing", handleFinishTyping);
+      sock.off("word_accepted", handleFinishWord);
+      sock.off("word_rejected", handleFinishWord);
     };
   }, [roomCode, addSystemChat, showFeedback]);
 
@@ -1712,12 +1755,16 @@ export default function App() {
 
   let currentView = null;
   if (screen === "lobby") currentView = <LobbyScreen onCreated={handleRoomCreated} onJoined={handleRoomJoined} connected={connected} gameMode={selectedMode} onModeChange={setSelectedMode} onFeedback={showFeedback} />;
-  else if (screen === "waiting") currentView = <WaitingScreen code={roomCode} players={players} myId={myId} gameMode={gameMode} maxPlayers={maxPlayers} colorDuration={colorDuration} onColorDurationChange={handleColorDurationChange} colorCardCount={colorCardCount} onColorCardCountChange={handleColorCardCountChange} gameLogs={gameLogs} onGameStart={handleGameStart} turnDuration={turnDuration} roundLimit={roundLimit} isCreator={creatorId === myId} onTurnDurationChange={handleTurnDurationChange} onRoundLimitChange={handleRoundLimitChange} onFeedback={showFeedback} recoveryCategory={recoveryCategory} />;
+  else if (screen === "waiting") currentView = gameMode === "finish-word"
+    ? <FinishWordLobby code={roomCode} players={players} myId={myId} creatorId={creatorId} maxPlayers={maxPlayers} socket={getSocket()} connected={connected && !restoring} onFeedback={showFeedback} />
+    : <WaitingScreen code={roomCode} players={players} myId={myId} gameMode={gameMode} maxPlayers={maxPlayers} colorDuration={colorDuration} onColorDurationChange={handleColorDurationChange} colorCardCount={colorCardCount} onColorCardCountChange={handleColorCardCountChange} gameLogs={gameLogs} onGameStart={handleGameStart} turnDuration={turnDuration} roundLimit={roundLimit} isCreator={creatorId === myId} onTurnDurationChange={handleTurnDurationChange} onRoundLimitChange={handleRoundLimitChange} onFeedback={showFeedback} recoveryCategory={recoveryCategory} />;
   else if (screen === "game" && gameState) currentView = gameMode === "color-card"
     ? <ColorCardGameView key={gameState.roundId} gameState={gameState} socket={getSocket()} myId={myId} connected={connected} onFeedback={showFeedback} />
+    : gameMode === "finish-word" ? <FinishWordGameView gameState={gameState} myId={myId} socket={getSocket()} connected={connected && !restoring} onFeedback={showFeedback} onRematch={handleRematch} />
     : <GameScreen gameState={{ ...gameState, code: roomCode, turnDuration, roundLimit }} myId={myId} gameLogs={gameLogs} setGameLogs={setGameLogs} onGameOver={handleGameOver} onReturnToWaiting={handleReturnToWaiting} onFeedback={showFeedback} />;
   else if (screen === "gameover" && gameOverResult) currentView = gameMode === "color-card"
     ? <ColorCardResultsView key={`${gameOverResult.roundId}:${gameOverResult.phase}`} result={gameOverResult} myId={myId} connected={connected} onRematch={handleRematch} onQuit={handleQuit} leaving={leaving} />
+    : gameMode === "finish-word" ? <FinishWordGameView gameState={gameOverResult} myId={myId} socket={getSocket()} connected={connected && !restoring} onFeedback={showFeedback} onRematch={handleRematch} />
     : <GameOverScreen result={gameOverResult} myId={myId} onRematch={handleRematch} onQuit={handleQuit} leaving={leaving} />;
   return (
     <>

@@ -15,7 +15,9 @@
 .feedback-toast > span:nth-child(2) { flex: 1; min-width: 0; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .toast-dismiss { display: grid; place-items: center; flex: none; border: 0; background: transparent; border-radius: 8px; width: 44px; height: 44px; color: inherit; opacity: .75; pointer-events: auto; }
 .toast-dismiss:hover { opacity: 1; background: #ffffff12; }
-.mode-discovery { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 26px; }
+.mode-discovery { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 26px; }
+.finish-word-demo-chain { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px; min-height: 150px; padding: 25px 0; font: 700 clamp(13px, 1.4vw, 20px) var(--font-mono); }
+.finish-word-demo-chain strong { color: var(--mint); }
 .mode-discovery button { min-width: 0; display: flex; align-items: center; text-align: left; gap: 10px; padding: 13px; border: 1px solid #354361; border-radius: 13px; background: #141f33; color: var(--muted); }
 .mode-discovery button.selected { border-color: #aa9bff; background: #a99bff14; color: var(--text); box-shadow: 0 6px 22px #0002; }
 .mode-discovery button > svg, .color-mode-icon { flex: none; }
@@ -123,6 +125,8 @@ html.game-viewport { height: 100%; overflow: hidden; overscroll-behavior: none; 
   .in-game .move-panel.action-ask .action-tab-row { margin-bottom: 0; }
 }
 @media (max-width: 680px) {
+  .mode-discovery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mode-discovery button:last-child { grid-column: 1 / -1; }
   .site-header-inner { gap: 6px; }
   .site-nav { flex-wrap: nowrap; gap: 3px; }
   .sound-toggle > span:last-child { display: none; }

@@ -10,6 +10,7 @@ import {
 const GAME_BRANDS = {
   "word-duel": { title: "Word Duel", subtitle: "THE WORD BATTLE ARENA" },
   "color-card": { title: "Color Card", subtitle: "THE COLOR MEMORY ARENA" },
+  "finish-word": { title: "Finish the Word", subtitle: "THE WORD CHAIN ARENA" },
 };
 
 export function Brand({ compact = false, gameMode }) {
@@ -103,6 +104,7 @@ export function ConfettiBurst({ active }) {
 
 export function RulesDialog({ onClose, gameMode = "word-duel" }) {
   const isColorCard = gameMode === "color-card";
+  const isFinishWord = gameMode === "finish-word";
   useEffect(() => {
     const onKey = (event) => { if (event.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKey);
@@ -111,10 +113,14 @@ export function RulesDialog({ onClose, gameMode = "word-duel" }) {
   return (
     <ModalOverlay className="rules-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <div className="rules-dialog" role="dialog" aria-modal="true" aria-labelledby="rules-heading">
-        <div className="rules-top"><span className="eyebrow"><IconLightning size={14} color="currentColor" /> {isColorCard ? "COLOR CARD" : "WORD DUEL"} · HOW TO PLAY</span><button className="close-circle" onClick={onClose} aria-label="Close instructions"><IconX size={17} color="currentColor" /></button></div>
-        <h2 id="rules-heading">{isColorCard ? <>One target. Your color.<br /><span>Closest match wins.</span></> : <>Secret words. Sharp minds.<br /><span>Crack the code first.</span></>}</h2>
+        <div className="rules-top"><span className="eyebrow"><IconLightning size={14} color="currentColor" /> {isFinishWord ? "FINISH THE WORD" : isColorCard ? "COLOR CARD" : "WORD DUEL"} · HOW TO PLAY</span><button className="close-circle" onClick={onClose} aria-label="Close instructions"><IconX size={17} color="currentColor" /></button></div>
+        <h2 id="rules-heading">{isFinishWord ? <>Last letter. Next word.<br /><span>Stay in the chain.</span></> : isColorCard ? <>One target. Your color.<br /><span>Closest match wins.</span></> : <>Secret words. Sharp minds.<br /><span>Crack the code first.</span></>}</h2>
         <div className="rules-steps">
-          {isColorCard ? <>
+          {isFinishWord ? <>
+            <div><span className="rule-number">01</span><div className="rule-icon"><IconShield size={21} color="currentColor" /></div><div><h3>Choose your character</h3><p>Pick one of eight exclusive characters. Once everyone has a character, the host can start with 2 to 8 players. Each player begins with three hearts.</p></div></div>
+            <div><span className="rule-number">02</span><div className="rule-icon"><IconClock size={21} color="currentColor" /></div><div><h3>Ten seconds. One word.</h3><p>On your turn, enter an English word of at least two letters starting with the displayed letter. Each accepted word passes its last letter to the next player. A word can only be used once per match. Everyone can see what you type.</p></div></div>
+            <div><span className="rule-number">03</span><div className="rule-icon"><IconLightning size={21} color="currentColor" /></div><div><h3>Keep your hearts</h3><p>An invalid word or a timeout costs one heart and passes the turn. After ten accepted words, the chain uses the last two letters. An impossible suffix is still a challenge: keep your hearts until one player remains.</p></div></div>
+          </> : isColorCard ? <>
             <div><span className="rule-number">01</span><div className="rule-icon"><IconTarget size={21} color="currentColor" /></div><div><h3>Shared colors, one memory</h3><p>The host chooses the card count and answer time. Each card has a unique random color, shared with everyone for 5 seconds before it disappears.</p></div></div>
             <div><span className="rule-number">02</span><div className="rule-icon"><IconClock size={21} color="currentColor" /></div><div><h3>Mix, submit, or edit</h3><p>Use hue, saturation, and brightness to color your blank card. The host chooses 30, 45, or 60 seconds. If everyone submits with at least 20 seconds left, a vote opens to reveal results early. More than half of all players must vote Yes; voting closes 10 seconds before the answer timer. Editing cancels the vote.</p></div></div>
             <div><span className="rule-number">03</span><div className="rule-icon"><IconCheck size={21} color="currentColor" /></div><div><h3>Results, rankings, repeat</h3><p>Your latest color is auto-submitted at the deadline. Results show your accuracy and submission time, excluding paused time. Review for 5 seconds, then see rankings for 10 seconds. The next card starts automatically. Highest average accuracy wins the match.</p></div></div>
@@ -124,7 +130,7 @@ export function RulesDialog({ onClose, gameMode = "word-duel" }) {
           <div><span className="rule-number">03</span><div className="rule-icon"><IconTarget size={21} color="currentColor" /></div><div><h3>Take your shot</h3><p>Ask a count for a confirmed letter, or try a full-word guess. Every action uses your turn; a wrong guess isn't the end.</p></div></div>
           </>}
         </div>
-        <div className="rules-foot"><span><IconCheck size={15} color="currentColor" /> {isColorCard ? "Mix, match, win." : "Ask, deduce, win."}</span><button onClick={onClose} className="btn-fun btn-fun-yellow">Got it <span aria-hidden="true">↗</span></button></div>
+        <div className="rules-foot"><span><IconCheck size={15} color="currentColor" /> {isFinishWord ? "Link words. Outlast everyone." : isColorCard ? "Mix, match, win." : "Ask, deduce, win."}</span><button onClick={onClose} className="btn-fun btn-fun-yellow">Got it <span aria-hidden="true">↗</span></button></div>
       </div>
     </ModalOverlay>
   );
@@ -135,6 +141,7 @@ export function SectionHeading({ kicker, title, right }) {
 }
 
 export function StepsPreview({ gameMode = "word-duel" }) {
+  if (gameMode === "finish-word") return <div className="gameplay-guide"><div><span className="guide-icon"><IconShield size={19} color="currentColor" /></span><strong>Choose a character</strong><small>One character per player</small></div><span className="guide-arrow">→</span><div><span className="guide-icon"><IconLetters size={19} color="currentColor" /></span><strong>Chain your words</strong><small>Follow the last letter</small></div><span className="guide-arrow">→</span><div><span className="guide-icon"><IconCheck size={19} color="currentColor" /></span><strong>Keep your hearts</strong><small>Last player wins</small></div></div>;
   if (gameMode === "color-card") return <div className="gameplay-guide"><div><span className="guide-icon"><IconTarget size={19} color="currentColor" /></span><strong>Memorize</strong><small>Five seconds to look</small></div><span className="guide-arrow">→</span><div><span className="guide-icon"><IconLightning size={19} color="currentColor" /></span><strong>Mix your color</strong><small>Hue, saturation, brightness</small></div><span className="guide-arrow">→</span><div><span className="guide-icon"><IconCheck size={19} color="currentColor" /></span><strong>Compare</strong><small>Closest match wins</small></div></div>;
   return <div className="gameplay-guide">
     <div><span className="guide-icon"><IconLetters size={19} color="currentColor" /></span><strong>Ask a letter</strong><small>Gather intel</small></div>

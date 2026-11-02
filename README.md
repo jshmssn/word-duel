@@ -1,6 +1,6 @@
 # Word Duel — Arena UI v2
 
-A real-time multiplayer lobby with **Word Duel** and **Color Card**, a responsive React/Vite interface, and a Node/Socket.IO game server. Both modes support room limits of 2–8 players. Word Duel retains its deduction rules, bot practice, timed turns, category roulette, chat, and series play. The existing Word Chain backend is preserved.
+A real-time multiplayer lobby with **Word Duel**, **Color Card**, and **Finish the Word**, a responsive React/Vite interface, and a Node/Socket.IO game server. All modes support room limits of 2–8 players. Word Duel retains its deduction rules, bot practice, timed turns, category roulette, chat, and series play. The existing Word Chain backend is preserved.
 
 ## Quick start
 
@@ -35,11 +35,17 @@ Restart the Vite dev server or rebuild the client after changing an environment 
 ## How to play
 
 1. Choose a game mode and max players (2–8), create a private room, and share its 8-character code. Joining players inherit the host's mode and room limit. Bot practice remains a two-player Word Duel match.
-2. All joined players press **Ready**; at least two players are needed. The room starts after the existing countdown, without needing to fill every available seat. Word Duel hosts can select an unlimited, 30-, 45-, or 60-second turn timer and a single-round, best-of-3, or best-of-5 match.
+2. For Word Duel and Color Card, all joined players press **Ready**; at least two players are needed. The room starts after the existing countdown, without needing to fill every available seat. Word Duel hosts can select an unlimited, 30-, 45-, or 60-second turn timer and a single-round, best-of-3, or best-of-5 match.
 3. Each player receives a secret word from the same category. Don't reveal yours!
 4. On your turn, ask whether a letter is present, ask **how many** of an already confirmed letter appear, or guess the whole opponent's word. Each player investigates the next player in lobby order, and turns rotate through everyone. Two-player matches work as before.
 5. Confirmed letters are **unordered clues**, not revealed letter positions. Drag or tap tiles in the private letter workbench to hypothesize an order. That never modifies the actual word; guesses are evaluated server-side.
 6. The first correct full-word guess wins the round; track your record in the results screen.
+
+### Finish the Word
+
+Choose **Finish the Word** in the game hub. In the character lobby, every player picks one of eight exclusive SVG characters, then the host starts. Each player has three hearts and ten seconds per turn to submit a dictionary word of at least two letters. Words start with the previous word's final letter and cannot repeat. After ten accepted words, follow the final two letters. An invalid word or timeout costs one heart and passes the turn; the final survivor wins. The arena focuses on the active character and broadcasts their live typing in a speech bubble.
+
+The server uses `better-sqlite3` and seeds an indexed single-column `words` table from the bundled `word-duel-server/clean-words.txt` at startup. The supplied list contains **89,239 words**. See [the complete setup and implementation guide](../word-duel-server/FINISH_WORD_SETUP.md) for the importer CLI, file map, socket protocol, and configuration. Matches support the existing session restoration, paused countdowns, and majority kick votes after 45 seconds.
 
 ### Color Card
 
@@ -47,7 +53,7 @@ The host chooses **1–100 cards** (default **5**) and **30 seconds, 45 seconds,
 
 The three-column panel provides **hue**, **saturation**, and **brightness/value** controls, with a live preview. Press the arrow to submit early, or **Edit answer** to revise it. **Everyone, including the host, keeps the entire answer window**, even after all players have submitted. The server saves selections as they change and finalizes everyone's latest color at the shared deadline. Answers still being edited are **auto-submitted**; an untouched card submits white.
 
-After the deadline, each player has **5 seconds to review their own result**: selected color versus original, accuracy in the top-right, and feedback ranging from absurd roasts to high praise. The server then reveals **card rankings to everyone for 10 seconds** before starting the next card automatically. There is no host advance button. The final card leads to final rankings instead of another card. Disconnecting cancels the match and clears all phase timers.
+After the deadline, each player has **5 seconds to review their own result**: selected color versus original, accuracy in the top-right, and feedback ranging from absurd roasts to high praise. The server then reveals **card rankings to everyone for 10 seconds** before starting the next card automatically. There is no host advance button. The final card leads to final rankings instead of another card. Disconnecting pauses the match and its timers while the player reconnects. A majority of active players can vote to remove them after 45 seconds.
 
 RGB Euclidean distance determines each card's closest match; equal distances share the win. Accuracy is `100 × (1 − distance / sqrt(3 × 255²))`. Standings track average accuracy across completed cards. After the configured card count, the highest average accuracy wins the match and **Play again** returns everyone to the lobby.
 
@@ -55,7 +61,7 @@ RGB Euclidean distance determines each card's closest match; equal distances sha
 
 | Event | Direction | Payload / behavior |
 | --- | --- | --- |
-| `CREATE_ROOM` | Client → server | `{ username, gameMode: "word-duel" \| "color-card", maxPlayers: 2..8, colorDuration?: 30 \| 45 \| 60, colorCardCount?: 1..100 }`. Replies with `room-created`; optional acknowledgement returns `{ success, ...room }`. |
+| `CREATE_ROOM` | Client → server | `{ username, gameMode: "word-duel" \| "color-card" \| "finish-word", maxPlayers: 2..8, colorDuration?: 30 \| 45 \| 60, colorCardCount?: 1..100 }`. Replies with `room-created`; optional acknowledgement returns `{ success, ...room }`. |
 | `JOIN_ROOM` | Client → server | `{ code, username }`. Server enforces capacity and waiting state, then emits `room-joined` and `player-joined`. |
 | `START_GAME` | Client → server | `{ code }`, host only, all joined players ready. The normal ready countdown also starts the selected mode automatically. |
 | `START_GAME` | Server → client | Color Card: `{ code, gameMode, matchId, roundNumber, totalRounds, roundId, targetColor, phase: "memorizing", serverNow, memorizeEndsAt, memorizeDuration, roundEndsAt, roundDuration, players, submittedPlayerIds }`. Emitted automatically for every card. |

@@ -8,7 +8,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "node --test test/*.test.js",
-    "test:mobile": "playwright test"
+    "test:mobile": "playwright test",
+    "test:finish-live": "node test/live/finishWordSmoke.js"
   },
   "dependencies": {
     "react": "^18.2.0",

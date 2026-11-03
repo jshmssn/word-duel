@@ -60,9 +60,10 @@ body::before {
   position: fixed;
   inset: 0;
   background:
-    var(--accent-solid);
+    rgba(255, 77, 166, 0.08);
   pointer-events: none;
   z-index: 0;
+  display: none;
 }
 
 /* Floating stars bg */
@@ -71,7 +72,7 @@ body::after {
   position: fixed;
   inset: 0;
   background:
-    var(--accent-solid);
+    rgba(199, 125, 255, 0.08);
   background-position:
     18px 24px,
     76px 62px;
@@ -80,6 +81,7 @@ body::after {
     156px 124px;
   pointer-events: none;
   z-index: 0;
+  display: none;
 }
 
 button {
@@ -131,7 +133,7 @@ input {
   background: none;
   filter: drop-shadow(3px 5px 0 rgba(0, 0, 0, 0.5));
   animation: title-float 3s ease-in-out infinite;
-  color: var(--accent-solid);
+  color: var(--yellow);
 }
 
 @keyframes title-float {
@@ -224,7 +226,7 @@ input {
   left: 0;
   right: 0;
   height: 3px;
-  background: var(--accent-solid);
+  background: var(--yellow);
 }
 
 /* TABS */
@@ -250,7 +252,7 @@ input {
 }
 
 .tab-pill.active {
-  background: var(--accent-solid);
+  background: var(--yellow);
   color: #1a0533;
   box-shadow: 0 3px 0 rgba(0, 0, 0, 0.3);
   transform: translateY(-1px);
@@ -317,7 +319,7 @@ input {
 }
 
 .btn-fun-yellow {
-  background: var(--accent-solid);
+  background: var(--yellow);
   color: #1a0533;
   box-shadow: 0 5px 0 #8b6000;
 }
@@ -336,7 +338,7 @@ input {
 }
 
 .btn-fun-cyan {
-  background: var(--accent-solid);
+  background: var(--cyan);
   color: #0a0020;
   box-shadow: 0 5px 0 #005070;
 }
@@ -350,7 +352,7 @@ input {
 }
 
 .btn-fun-pink {
-  background: var(--accent-solid);
+  background: var(--pink);
   color: #fff;
   box-shadow: 0 5px 0 #7a0040;
 }
@@ -364,7 +366,7 @@ input {
 }
 
 .btn-fun-green {
-  background: var(--accent-solid);
+  background: var(--green);
   color: #0a1a00;
   box-shadow: 0 5px 0 #1a6000;
 }
@@ -378,7 +380,7 @@ input {
 }
 
 .btn-fun-red {
-  background: var(--accent-solid);
+  background: var(--red);
   color: #fff;
   box-shadow: 0 5px 0 #600000;
 }
@@ -525,7 +527,7 @@ input {
   letter-spacing: 10px;
   background: none;
   filter: drop-shadow(2px 3px 0 rgba(0, 0, 0, 0.4));
-  color: var(--accent-solid);
+  color: var(--yellow);
 }
 
 .copy-hint {
@@ -701,7 +703,7 @@ input {
   min-height: 64px;
 }
 .btn-ready-fun.not-ready {
-  background: var(--accent-solid);
+  background: #26324f;
   color: #d7f6ff;
   border: 3px solid rgba(0, 229, 255, 0.45);
   box-shadow:
@@ -717,7 +719,7 @@ input {
 }
 
 .btn-ready-fun.is-ready {
-  background: var(--accent-solid);
+  background: var(--green);
   color: #0a1a00;
   border: 3px solid #1a8000;
   box-shadow:
@@ -739,7 +741,7 @@ input {
   }
 }
 .btn-ready-fun.is-ready:hover {
-  background: var(--accent-solid);
+  background: #dc143c;
   color: #fff;
   border-color: #ff6b83;
   box-shadow:
@@ -766,7 +768,7 @@ input {
   background: none;
   filter: drop-shadow(3px 5px 0 rgba(0, 0, 0, 0.5));
   animation: count-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-  color: var(--accent-solid);
+  color: var(--yellow);
 }
 @keyframes count-pop {
   from {
@@ -828,7 +830,7 @@ input {
 
 .chat-header-fun {
   padding: 12px 16px;
-  background: var(--accent-solid);
+  background: var(--bg3);
   border-bottom: 2px solid var(--border);
   font-family: var(--font-display);
   font-size: 1rem;
@@ -886,13 +888,13 @@ input {
   word-break: break-word;
 }
 .chat-bubble.mine .chat-bubble-inner {
-  background: var(--accent-solid);
+  background: rgba(255, 225, 53, 0.2);
   border: 2px solid rgba(255, 225, 53, 0.3);
   border-bottom-right-radius: 4px;
   color: var(--text);
 }
 .chat-bubble.theirs .chat-bubble-inner {
-  background: var(--accent-solid);
+  background: rgba(0, 229, 255, 0.15);
   border: 2px solid rgba(0, 229, 255, 0.25);
   border-bottom-left-radius: 4px;
   color: var(--text);
@@ -968,7 +970,7 @@ input {
 }
 
 .btn-send-fun {
-  background: var(--accent-solid);
+  background: var(--cyan);
   color: #001820;
   border-radius: 10px;
   padding: 9px 13px;
@@ -1037,7 +1039,7 @@ input {
   gap: 8px;
 }
 .turn-badge.your-turn {
-  background: var(--accent-solid);
+  background: var(--yellow);
   color: #1a0533;
   box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3);
   animation: turn-bounce 1s ease-in-out infinite;
@@ -1097,17 +1099,17 @@ input {
   content: "";
   position: absolute;
   inset: 0;
-  background: var(--accent-solid);
+  background: rgba(255, 255, 255, 0.04);
   pointer-events: none;
   display: none;
 }
 
 .word-card.my-card {
-  background: var(--accent-solid);
+  background: #0d2a1a;
   border: 3px solid rgba(105, 255, 71, 0.4);
 }
 .word-card.opp-card {
-  background: var(--accent-solid);
+  background: #0d1e35;
   border: 3px solid rgba(0, 229, 255, 0.4);
 }
 
@@ -1159,7 +1161,7 @@ input {
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 .letter-tile.confirmed {
-  background: var(--accent-solid);
+  background: rgba(0, 229, 255, 0.25);
   border-color: var(--cyan);
   color: var(--cyan);
   box-shadow: 0 0 12px rgba(0, 229, 255, 0.4);
@@ -1277,7 +1279,7 @@ input {
 }
 
 .alpha-key.asked-yes {
-  background: var(--accent-solid);
+  background: rgba(105, 255, 71, 0.25);
   border-color: var(--green);
   color: var(--green);
   box-shadow:
@@ -1521,14 +1523,14 @@ input {
   content: "";
   position: absolute;
   inset: 0;
-  background: var(--accent-solid);
+  background: rgba(255, 225, 53, 0.15);
   pointer-events: none;
 }
 .gameover-card.lose-card::before {
   content: "";
   position: absolute;
   inset: 0;
-  background: var(--accent-solid);
+  background: rgba(255, 68, 68, 0.12);
   pointer-events: none;
 }
 
@@ -1554,11 +1556,11 @@ input {
 .win-title {
   background: none;
   animation: title-float 2s ease-in-out infinite;
-  color: var(--accent-solid);
+  color: var(--yellow);
 }
 .lose-title {
   background: none;
-  color: var(--accent-solid);
+  color: var(--red);
 }
 
 .gameover-scoreboard {
@@ -1765,7 +1767,7 @@ input {
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: var(--accent-solid);
+  background: var(--purple);
   border: 2.5px solid rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
@@ -2004,7 +2006,7 @@ input {
   padding: max(18px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right))
     max(18px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
   background:
-    var(--accent-solid);
+    rgba(8, 2, 20, 0.86);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   animation: prompt-backdrop-in 0.18s ease;
@@ -2023,7 +2025,7 @@ input {
   width: min(520px, 100%);
   max-height: min(86vh, 620px);
   overflow-y: auto;
-  background: var(--accent-solid);
+  background: rgba(46, 16, 80, 0.98);
   border: 2px solid rgba(199, 125, 255, 0.78);
   border-radius: 24px;
   padding: 24px;
@@ -2049,7 +2051,7 @@ input {
   inset: 10px 18px auto;
   height: 4px;
   border-radius: 999px;
-  background: var(--accent-solid);
+  background: var(--purple);
   opacity: 0.86;
 }
 @keyframes prompt-appear {
@@ -2253,7 +2255,7 @@ input {
 
 /* ─── Button variants for prompts ────────────────────────────────────── */
 .btn-fun-green {
-  background: var(--accent-solid) !important;
+  background: #00c853 !important;
   color: #0a1a0a !important;
   border-color: rgba(0, 200, 83, 0.4) !important;
   box-shadow: 0 4px 14px rgba(0, 200, 83, 0.3) !important;
@@ -2264,7 +2266,7 @@ input {
 }
 
 .btn-fun-red {
-  background: var(--accent-solid) !important;
+  background: #ff4444 !important;
   color: white !important;
   border-color: rgba(255, 68, 68, 0.4) !important;
   box-shadow: 0 4px 14px rgba(255, 68, 68, 0.3) !important;

@@ -308,7 +308,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
   const cardStyle = {
     position: "relative",
     padding: "22px 18px 18px",
-    background: "var(--accent-solid)",
+    background: "#222f4a",
     border: "1px solid #566686",
     borderRadius: 28,
     boxShadow:
@@ -323,7 +323,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
     height: 5,
     borderRadius: 999,
     background:
-      "var(--accent-solid)",
+      "#c77dff",
     backgroundSize: "300% 100%",
     animation: "slotRainbowSlide 2.2s linear infinite",
     opacity: 0.82,
@@ -365,7 +365,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
     borderRadius: 18,
     border: `1px solid ${landed ? accent : "rgba(168, 153, 255, 0.25)"}`,
     background: landed
-      ? "var(--accent-solid)"
+      ? `${accent}24`
       : "rgba(168, 153, 255, 0.08)",
     boxShadow: landed
       ? `0 0 26px ${accent}80, inset 0 0 22px ${accent}28`
@@ -393,7 +393,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
     right: 0,
     [edge]: 0,
     height: 86,
-    background: "var(--accent-solid)",
+    background: "#0b1428",
     pointerEvents: "none",
   });
 
@@ -459,7 +459,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
               position: "absolute",
               inset: 0,
               background:
-                "var(--accent-solid)",
+                "rgba(255,255,255,0.055)",
               mixBlendMode: "screen",
               opacity: 0.2,
               pointerEvents: "none",
@@ -547,7 +547,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
                       borderRadius: 999,
                       border: `1px solid ${isWinner ? item.accent : "rgba(70, 86, 117, 0.78)"}`,
                       background: isWinner
-                        ? "var(--accent-solid)"
+                        ? `${item.accent}24`
                         : "rgba(28, 41, 67, 0.87)",
                       color: "#f1f5ff",
                       fontFamily: "var(--font-display)",
@@ -604,7 +604,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
                 padding: "10px 18px",
                 borderRadius: 18,
                 border: `1px solid ${accent}`,
-                background: "var(--accent-solid)",
+                background: `${accent}22`,
                 boxShadow: `0 0 26px ${accent}44`,
                 animation: "slotResultIn 420ms cubic-bezier(.2,.9,.25,1.2) both",
               }}

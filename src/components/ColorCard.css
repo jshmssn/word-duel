@@ -43,15 +43,27 @@
 .color-personal-result { margin-inline: auto; }
 /* Keep the reference attached to page scrolling, past legacy overflow wrappers. */
 #root:has(.color-ranking-reference) { overflow: clip; }
-.color-results-screen:has(.color-ranking-reference) { overflow: visible; }
-.color-ranking-reference { position: sticky; top: max(12px, env(safe-area-inset-top)); z-index: 6; width: 100%; margin: 20px 0 4px; }
-.color-ranking-target { min-height: 132px; border: 1px solid #ffffff50; border-radius: 16px; box-shadow: 0 8px 28px #0005; }
+.color-results-screen:has(.color-ranking-reference) { --color-reference-height: clamp(132px, 20dvh, 200px); overflow: visible; }
+.color-ranking-reference { position: sticky; top: max(12px, env(safe-area-inset-top)); z-index: 6; width: 100%; margin: 20px 0 4px; overflow: hidden; border: 1px solid #ffffff50; border-radius: 16px; background: #18243b; box-shadow: 0 8px 28px #0005; }
+.color-ranking-target { height: var(--color-reference-height); }
 .color-ranking-target .color-swatch-label > strong { font: 700 19px/1.4 var(--font-mono); }
+.color-ranking-submissions { width: 100%; min-width: 0; display: grid; grid-template-columns: repeat(var(--color-player-count), minmax(108px, 1fr)); margin: 0; padding: 0; list-style: none; border-top: 1px solid #ffffff60; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: thin; scrollbar-color: #ffffff70 #18243b; }
+.color-ranking-submissions:focus-visible { outline: 2px solid var(--cyan); outline-offset: -3px; }
+.color-ranking-submissions > li { min-width: 0; border-inline-start: 1px solid #ffffff40; }
+.color-ranking-submissions > li:first-child { border-inline-start: 0; }
+.color-ranking-submission { height: var(--color-reference-height); padding: clamp(12px, 1.3vw, 22px); justify-content: space-between; gap: 8px; }
+.color-ranking-submission .color-swatch-label { max-width: 100%; }
+.color-ranking-submission .color-swatch-label > span { opacity: 1; font-weight: 700; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.color-ranking-submission .color-swatch-label > strong { font: 500 10px/1.6 var(--font-mono); }
+.color-comparison-accuracy { align-self: flex-end; display: flex; flex-direction: column; align-items: flex-end; }
+.color-comparison-accuracy > span { font: 700 8px/1.5 var(--font-mono); letter-spacing: 1px; opacity: .7; }
+.color-comparison-accuracy > strong { font: 700 clamp(20px, 2.2vw, 32px)/1.1 var(--font-display); letter-spacing: -1px; white-space: nowrap; }
+.color-comparison-accuracy small { font-size: .5em; letter-spacing: 0; }
 .color-card-ranking { width: 100%; padding: 22px; border: 1px solid #34415b; border-radius: 16px; background: #18243b; margin: 24px 0; }
 .color-card-ranking h2 { margin: 0; }
 .color-card-ranking > p { color: var(--muted); font-size: 13px; }
 .color-card-ranking ol { list-style: none; padding: 0; display: grid; gap: 10px; }
-.color-card-ranking li { display: grid; grid-template-columns: 24px 48px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px; border: 1px solid #34415b; border-radius: 10px; scroll-margin-top: 160px; }
+.color-card-ranking li { display: grid; grid-template-columns: 24px 48px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px; border: 1px solid #34415b; border-radius: 10px; scroll-margin-top: calc(var(--color-reference-height) * 2 + 36px); }
 .color-card-ranking li.is-you { border-color: var(--mint); }
 .color-rank-number { color: var(--muted); font-family: var(--font-mono); }
 .color-ranking-swatch { width: 48px; height: 48px; border: 1px solid #ffffff50; border-radius: 8px; }
@@ -116,6 +128,16 @@
 .podium-count-2 .place-1 { order: 0; }
 .podium-count-2 .place-2 { order: 1; }
 .podium-count-1 { grid-template-columns: minmax(0,220px); justify-content: center; }
+@media (max-height: 500px) {
+  .color-results-screen:has(.color-ranking-reference) { --color-reference-height: clamp(80px, 20dvh, 100px); }
+  .color-ranking-target { padding: 12px; }
+  .color-ranking-target .color-card-progress { position: static; margin-bottom: 6px; font-size: 9px; }
+  .color-ranking-target .color-swatch-label { line-height: 1.4; }
+  .color-ranking-target .color-swatch-label > strong { font-size: 14px; }
+  .color-ranking-submission { padding: 8px 12px; gap: 4px; }
+  .color-ranking-submission .color-swatch-label { font-size: 10px; line-height: 1.3; }
+  .color-comparison-accuracy > strong { font-size: 20px; }
+}
 @media (max-width: 680px) {
   .color-podium { padding: 22px 10px 0; border-radius: 16px; }
   .color-podium-grid { gap: 6px; margin-top: 14px; }

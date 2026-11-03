@@ -156,6 +156,21 @@ function ResultCard({ entry, result, myId }) {
   </article>;
 }
 
+function ColorRankingReference({ result, myId }) {
+  return <section className="color-ranking-reference" aria-label="Given card color">
+    <ColorSwatch color={result.targetColor} testId="target-color" className="color-ranking-target" progress={`CARD ${result.roundNumber} · ORIGINAL`} label="Given card color" detail={result.targetColor} />
+    <ul className="color-ranking-submissions" aria-label="Players' submitted colors" tabIndex={0} style={{ "--color-player-count": Math.max(1, result.entries.length) }}>
+      {result.entries.map((entry) => <li key={entry.id}>
+        <ColorSwatch color={entry.submittedColor} testId="submitted-color" className="color-ranking-submission" label={`${entry.username}${entry.id === myId ? " (you)" : ""}`} detail={entry.submittedColor || "No submission"} corner={
+          <div className="color-comparison-accuracy" aria-label={Number.isFinite(entry.accuracy) ? `Accuracy ${entry.accuracy.toFixed(2)} percent` : "Unranked"}>
+            <span>ACCURACY</span><strong>{Number.isFinite(entry.accuracy) ? <>{entry.accuracy.toFixed(2)}<small>%</small></> : "—"}</strong>
+          </div>
+        } />
+      </li>)}
+    </ul>
+  </section>;
+}
+
 export function ColorCardResultsView({ result, myId, onRematch, connected, onQuit, leaving }) {
   const reviewing = result.phase === "review";
   const isWinner = !reviewing && (result.matchComplete ? result.matchWinnerIds : result.winnerIds)?.includes(myId);
@@ -179,7 +194,7 @@ export function ColorCardResultsView({ result, myId, onRematch, connected, onQui
   return <div className="screen color-card-screen color-results-screen">
     <ConfettiBurst active={isWinner} />
     <div className="page-intro"><div><span className="eyebrow">COLOR CARD · CARD {result.roundNumber} OF {result.totalRounds} · {reviewing ? "YOUR RESULT" : result.matchComplete ? "MATCH COMPLETE" : "RANKINGS"}</span><h1>{reviewing ? <>How close <span>did you get?</span></> : result.matchComplete ? <>Colors remembered. <span>Champion revealed.</span></> : <>Closest to <span>the color.</span></>}</h1><p role="status">{announcement}</p></div></div>
-    {!reviewing && <section className="color-ranking-reference" aria-label="Given card color"><ColorSwatch color={result.targetColor} testId="target-color" className="color-ranking-target" progress={`CARD ${result.roundNumber} · ORIGINAL`} label="Given card color" detail={result.targetColor} /></section>}
+    {!reviewing && <ColorRankingReference result={result} myId={myId} />}
     {(reviewing || !result.matchComplete) && <div className="color-round-status"><strong role="timer">{remaining}s {reviewing ? "until rankings" : "until the next card"}</strong><span>Everyone continues automatically</span></div>}
     {!reviewing && <ColorPodium result={result} myId={myId} />}
     {reviewing ? <div className="color-results-grid color-personal-result">{entries.map((entry) => <ResultCard key={entry.id} entry={entry} result={result} myId={myId} />)}</div>

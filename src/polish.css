@@ -48,7 +48,7 @@ html.game-viewport { height: 100%; overflow: hidden; overscroll-behavior: none; 
 .in-game .site-header-inner { min-height: 60px; }
 .in-game .site-footer { display: none; }
 .in-game .view-frame { flex: 1; min-height: 0; overflow: hidden; animation: none; }
-.in-game .screen { height: 100%; min-height: 0; padding: 12px max(16px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); overflow: hidden; }
+.in-game .screen { height: 100%; min-height: 0; padding: 12px var(--page-right) max(12px, env(safe-area-inset-bottom)) var(--page-left); overflow: hidden; }
 .in-game .game-layout { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 0; }
 .in-game .game-intro { flex: none; flex-direction: row; align-items: center; margin-bottom: 10px; gap: 8px; }
 .in-game .game-intro h1 { font-size: 25px; line-height: 1.15; margin: 0; letter-spacing: -.7px; }
@@ -99,7 +99,7 @@ html.game-viewport { height: 100%; overflow: hidden; overscroll-behavior: none; 
 .in-game .color-card-screen .page-intro h1 { font-size: clamp(22px,3vw,32px); margin: 3px 0; }
 .in-game .color-card-screen .page-intro p { font-size: 12px; margin-top: 2px; }
 .in-game .color-round-status { flex: none; margin: 0; padding: 8px 0; gap: 4px 12px; font-size: 11px; }
-.in-game .color-memory-card { flex: 1; min-height: 80px; width: min(100%,800px); margin: 0 auto; }
+.in-game .color-memory-card { flex: 1; min-height: 80px; width: 100%; margin: 0 auto; }
 .in-game .color-picker-panel { flex: 1; min-height: 0; margin: 0 auto; display: flex; flex-direction: column; gap: 8px; }
 .in-game .color-selection-frame { flex: 1; min-height: 80px; height: auto; }
 .in-game .color-picker-footer { flex: none; margin: 0; gap: 6px; }
@@ -115,8 +115,8 @@ html.game-viewport { height: 100%; overflow: hidden; overscroll-behavior: none; 
   .in-game .game-main-column { display: contents; }
   .in-game .word-panels, .in-game .move-panel, .in-game .game-sidebar { display: none; width: 100%; }
   .in-game .workspace-clues .word-panels, .in-game .workspace-play .move-panel, .in-game .workspace-activity .game-sidebar { display: flex; }
-  .in-game .workspace-play .move-panel { max-width: 800px; margin-inline: auto; }
-  .in-game .workspace-clues .word-panels { max-width: 800px; margin-inline: auto; }
+  .in-game .workspace-play .move-panel { margin-inline: auto; }
+  .in-game .workspace-clues .word-panels { margin-inline: auto; }
   .in-game .alpha-section-title { flex-direction: row; align-items: center; }
   .in-game .action-tab-btn { flex-direction: row; }
   .in-game .move-panel .action-card { order: -1; }

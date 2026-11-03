@@ -1167,7 +1167,6 @@ function GameOverScreen({ result, myId, onRematch, onQuit, leaving }) {
       <div className="result-eyebrow"><span className="eyebrow">✦ MATCH REPORT</span><span className="result-divider" /> {isWinner ? "A CHAMPION IS CROWNED" : "NEXT ROUND, NEW CHANCE"}</div>
       <div
         className={`gameover-card ${isWinner ? "win-card" : "lose-card"}`}
-        style={{ maxWidth: 480, width: "100%" }}
       >
         <div className="gameover-icon">
           {isWinner ? (

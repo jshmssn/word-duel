@@ -46,13 +46,11 @@ const SERVER_URL =
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
 
 const AVATAR_COLORS = [
-  ["#FFE135", "#FF7043"],
-  ["#00E5FF", "#7B2FFF"],
-  ["#FF4DA6", "#FF7043"],
-  ["#69FF47", "#00E5FF"],
+  "#FFE135", "#00E5FF", "#FF4DA6", "#69FF47",
+  "#FFB476", "#B6A3FF", "#87ACFF", "#F4A7C5",
 ];
 
-function avatarGrad(i) {
+function avatarColor(i) {
   return AVATAR_COLORS[i % AVATAR_COLORS.length];
 }
 
@@ -420,8 +418,8 @@ function WaitingScreen({
             <div className="player-panel">
               <SectionHeading kicker="YOUR ROOM" title="Player lineup" right={<span className="player-capacity">{players.length} / {maxPlayers} PLAYERS</span>} />
               <div className="player-slots" aria-label="Room players">
-                {Array.from({ length: maxPlayers }, (_, index) => index).map((i) => { const p = players[i]; const [c1, c2] = avatarGrad(i); const ready = p && isPlayerReady(p); return <div key={i} className={`player-card ${p ? "filled" : "empty"} ${ready ? "ready-yes" : ""}`}>
-                  <div className="player-avatar-fun" style={p ? { background: `linear-gradient(135deg,${c1},${c2})` } : {}}>{isFinishWord && p?.characterId ? <FinishWordCharacter characterId={p.characterId} decorative /> : p ? p.username[0].toUpperCase() : "?"}</div>
+                {Array.from({ length: maxPlayers }, (_, index) => index).map((i) => { const p = players[i]; const ready = p && isPlayerReady(p); return <div key={i} className={`player-card ${p ? "filled" : "empty"} ${ready ? "ready-yes" : ""}`}>
+                  <div className="player-avatar-fun" style={p ? { background: avatarColor(i) } : {}}>{isFinishWord && p?.characterId ? <FinishWordCharacter characterId={p.characterId} decorative /> : p ? p.username[0].toUpperCase() : "?"}</div>
                   <div className="player-ident"><div className="player-name-fun"><span className="player-display-name">{p ? p.username : "Awaiting challenger"}</span>{p?.id === myId && <span className="you-tag">YOU</span>}{p?.isBot && <span className="you-tag">BOT</span>}{p?.connected === false && <span className="player-connection-tag status-reconnecting">Reconnecting</span>}</div><div className="player-meta-row">{p ? isFinishWord ? <span>{FINISH_WORD_CHARACTERS.find((character) => character.id === p.characterId)?.name || "Choosing a character…"}</span> : isColorCard ? <span className="player-accuracy-stat" title={p.previousMatchCardCount ? `Average accuracy from the previous completed match (${p.previousMatchCardCount} cards)` : "No previous match recorded"}><IconTarget size={13} color="currentColor" /><strong>{(p.previousMatchAverageAccuracy ?? 0).toFixed(2)}%</strong> LAST MATCH AVG.</span> : <span><IconTrophy size={13} color="currentColor" /> {p.wins || 0} WINS</span> : <span>SHARE YOUR INVITE CODE ABOVE</span>}</div></div>
                   {p ? <span className={`ready-pill ${ready ? "yes" : "no"}`}>{ready ? <><IconCheck size={13} color="currentColor" /> READY</> : "NOT READY"}</span> : <span className="empty-player-pulse"><span className="pulse-dot" /></span>}
                 </div>; })}

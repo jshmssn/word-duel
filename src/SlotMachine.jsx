@@ -308,7 +308,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
   const cardStyle = {
     position: "relative",
     padding: "22px 18px 18px",
-    background: "linear-gradient(160deg, #222f4a, #141f35, #10192d)",
+    background: "var(--accent-solid)",
     border: "1px solid #566686",
     borderRadius: 28,
     boxShadow:
@@ -323,7 +323,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
     height: 5,
     borderRadius: 999,
     background:
-      "linear-gradient(90deg, #c77dff, #00e5ff, #ff4da6, #ffe135, #69ff47, #ff7043, #c77dff)",
+      "var(--accent-solid)",
     backgroundSize: "300% 100%",
     animation: "slotRainbowSlide 2.2s linear infinite",
     opacity: 0.82,
@@ -365,7 +365,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
     borderRadius: 18,
     border: `1px solid ${landed ? accent : "rgba(168, 153, 255, 0.25)"}`,
     background: landed
-      ? `linear-gradient(90deg, ${accent}24, rgba(255, 255, 255, 0.1), ${accent}24)`
+      ? "var(--accent-solid)"
       : "rgba(168, 153, 255, 0.08)",
     boxShadow: landed
       ? `0 0 26px ${accent}80, inset 0 0 22px ${accent}28`
@@ -393,10 +393,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
     right: 0,
     [edge]: 0,
     height: 86,
-    background:
-      edge === "top"
-        ? "linear-gradient(180deg, #0b1428 0%, rgba(11, 20, 40, 0) 100%)"
-        : "linear-gradient(0deg, #0b1428 0%, rgba(11, 20, 40, 0) 100%)",
+    background: "var(--accent-solid)",
     pointerEvents: "none",
   });
 
@@ -462,7 +459,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
               position: "absolute",
               inset: 0,
               background:
-                "repeating-linear-gradient(180deg, rgba(255,255,255,0.055) 0 1px, transparent 1px 5px)",
+                "var(--accent-solid)",
               mixBlendMode: "screen",
               opacity: 0.2,
               pointerEvents: "none",
@@ -550,7 +547,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
                       borderRadius: 999,
                       border: `1px solid ${isWinner ? item.accent : "rgba(70, 86, 117, 0.78)"}`,
                       background: isWinner
-                        ? `linear-gradient(90deg, ${item.accent}24, rgba(255, 255, 255, 0.12), ${item.accent}18)`
+                        ? "var(--accent-solid)"
                         : "rgba(28, 41, 67, 0.87)",
                       color: "#f1f5ff",
                       fontFamily: "var(--font-display)",
@@ -607,7 +604,7 @@ export default function SlotMachine({ selectedCategoryName, onDone }) {
                 padding: "10px 18px",
                 borderRadius: 18,
                 border: `1px solid ${accent}`,
-                background: `linear-gradient(135deg, ${accent}22, rgba(255,255,255,0.08))`,
+                background: "var(--accent-solid)",
                 boxShadow: `0 0 26px ${accent}44`,
                 animation: "slotResultIn 420ms cubic-bezier(.2,.9,.25,1.2) both",
               }}

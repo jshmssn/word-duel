@@ -69,6 +69,10 @@
 .finish-word-prefix-prompt { padding-top: clamp(18px, 3vh, 35px); }
 .finish-word-prefix-prompt > span, .finish-word-chain > span { color: #94aac5; font: 700 8px var(--font-mono); letter-spacing: 1px; }
 .finish-word-prefix-prompt > strong { display: flex; gap: 8px; margin: 10px 0; }
+.finish-word-prefix-prompt > strong:has(.finish-word-letter-choice) { flex-wrap: wrap; gap: 8px; }
+.finish-word-prefix-prompt.choosing { display: block; }
+.finish-word-letter-choice { flex: 1; min-width: 40px; min-height: 44px; padding: 10px 8px; border: 1px solid #8dd8bd80; border-radius: 10px; background: #87eabd12; color: #bcffe1; font: 700 26px var(--font-display); }
+.finish-word-letter-choice:hover:not(:disabled) { background: #87eabd30; border-color: var(--mint); }
 .finish-word-prefix-prompt > strong > span { min-width: 68px; display: grid; place-items: center; padding: 12px 8px; border: 1px solid #8dd8bd80; border-radius: 12px; background: #87eabd12; color: #bcffe1; font: 700 65px/.9 var(--font-display); }
 .finish-word-prefix-prompt > p { margin: 7px 0 0; color: #a0b3ca; font-size: 10px; overflow-wrap: anywhere; }.finish-word-prefix-prompt b { color: #d5e8fa; font-family: var(--font-mono); }
 .finish-word-chain { margin-top: 25px; }
@@ -81,6 +85,9 @@
 .finish-word-input-row:focus-within { outline: 2px solid #6ee9b97d; outline-offset: 2px; }
 .finish-word-input-row.invalid { border-color: #ff86a2; background: #3a2034; }
 .finish-word-input-row.invalid:focus-within { outline-color: #ff86a280; }
+.finish-word-locked-prefix { flex: none; display: flex; align-items: center; padding-left: 12px; color: var(--mint); font: 700 16px var(--font-mono); user-select: none; -webkit-user-select: none; }
+.finish-word-input-row > .finish-word-locked-prefix + input { padding-left: 0; text-transform: uppercase; }
+.finish-word-prefix-help { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .finish-word-input-row > input { min-width: 0; flex: 1; width: 100%; padding: 12px; border: none; background: none; border-radius: 0; box-shadow: none; color: #effcf7; font: 600 16px var(--font-mono); outline: none; }
 .finish-word-input-row > input:focus-visible { outline: none; }.finish-word-input-row > input::placeholder { color: #647e96; font-size: 12px; }.finish-word-input-row > input:disabled { opacity: .5; }
 .finish-word-input-row > button { flex: none; width: 45px; min-width: 45px; padding: 5px; border: 0; border-left: 1px solid #537d7d; border-radius: 0; background: #a2ecc8; color: #143c30; font-size: 25px; }.finish-word-input-row > button:disabled { opacity: .35; }

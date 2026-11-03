@@ -157,7 +157,7 @@ function FinishWordStage({ gameState, myId, localWord }) {
         <div className="finish-word-stage-floor" style={{ width: worldWidth + 400 }} aria-hidden="true" />
         {players.map((player, index) => {
           const active = gameState.currentPlayerId === player.id && gameState.status === "PLAYING";
-          const text = player.id === myId ? localWord : gameState.typingText;
+          const text = player.id === myId ? localWord : gameState.typingText || gameState.requiredPrefix;
           return <article key={player.id} className={`finish-word-actor ${active ? "active" : ""} ${player.isAlive === false ? "eliminated" : ""}`} style={{ left: 180 + index * actorStep, "--character-color": characterFor(player.characterId).color }} aria-label={`${playerName(player)}, ${player.isAlive === false ? "eliminated" : `${player.lives} lives`}${active ? ", current turn" : ""}`}>
             {active && <div className={`finish-word-speech ${text ? "has-word" : ""}`} data-testid="live-word-bubble" aria-label={`Live typing from ${playerName(player)}`}><span>{text || "Thinking…"}</span>{!text && <i aria-hidden="true">•••</i>}</div>}
             <div className="finish-word-nametag"><strong>{playerName(player)}{player.id === myId && <small>YOU</small>}</strong><FinishWordHearts lives={player.lives} /></div>
@@ -177,8 +177,8 @@ function FinishWordResults({ gameState, myId, connected, onRematch }) {
   const won = winner?.id === myId;
   return <div className="screen finish-word-results">
     <span className="eyebrow">FINISH THE WORD · FINAL WORD</span><h1>{won ? "You had the " : "The last "}<span>{won ? "last word." : "word warrior."}</span></h1>
-    <section className="finish-word-winner"><span className="finish-word-winner-crown" aria-hidden="true">♛</span><FinishWordCharacter characterId={winner?.characterId} /><h2>{winner ? playerName(winner) : gameState.winnerName || "Match ended"}{won ? " (you)" : ""}</h2><p>{winner ? "Last player standing" : "There are no active players remaining."}</p><FinishWordHearts lives={winner?.lives || 0} /></section>
-    <p className="finish-word-final-chain">{gameState.usedWords?.length || 0} unique words · {gameState.hardMode ? "Two-letter mode reached" : "One-letter chain"}</p>
+    <section className="finish-word-winner"><span className="finish-word-winner-crown" aria-hidden="true">♛</span><FinishWordCharacter characterId={winner?.characterId} /><h2>{winner ? playerName(winner) : gameState.endReason === "dictionary_exhausted" ? "Dictionary complete" : gameState.winnerName || "Match ended"}{won ? " (you)" : ""}</h2><p>{winner ? "Last player standing" : gameState.endReason === "dictionary_exhausted" ? "Every playable dictionary word has been used. Start a new match to play again." : "There are no active players remaining."}</p><FinishWordHearts lives={winner?.lives || 0} /></section>
+    <p className="finish-word-final-chain">{gameState.usedWords?.length || 0} unique words · {gameState.hardMode ? "Mixed difficulty reached" : "One-letter chain"}</p>
     <ul className="finish-word-final-players" aria-label="Final player lives">{[...gameState.players].sort((first, second) => (second.lives || 0) - (first.lives || 0)).map((player) => <li key={player.id}><span>{playerName(player)}{player.id === myId ? " (you)" : ""}</span><FinishWordHearts lives={player.lives} /></li>)}</ul>
     <button type="button" className="btn-fun btn-fun-yellow" disabled={!connected} onClick={onRematch}>Back to character lobby <span aria-hidden="true">↗</span></button>
   </div>;
@@ -187,27 +187,36 @@ function FinishWordResults({ gameState, myId, connected, onRematch }) {
 export function FinishWordGameView({ gameState, myId, socket, connected, onFeedback, onRematch }) {
   const controller = useFinishWord({ gameState, socket, myId, connected, onFeedback });
   const viewport = useVisualViewport();
-  const { word, changeWord, submit, inputRef, pending, error, remaining, canPlay, isMyTurn, me, activePlayer } = controller;
+  const { word, suffix, changeWord, pasteWord, submit, inputRef, pending, error, remaining, canPlay, canChooseLetter, chooseStartingLetter, choosingLetter, isMyTurn, me, activePlayer } = controller;
   const total = gameState.turnDuration || 15;
   const progress = Math.min(100, Math.max(0, remaining / total * 100));
-  const prefix = gameState.requiredPrefix || "?";
-  const status = !connected ? "Reconnecting to the arena…" : gameState.pausedAt ? "Game paused while a player reconnects." : me?.isAlive === false ? "You're out. Watch the remaining word warriors." : isMyTurn ? "Your turn. Keep the chain alive." : `${playerName(activePlayer)} is finding a word.`;
+  const prefix = gameState.requiredPrefix || "";
+  const choosing = gameState.awaitingStartingLetterChoice;
+  const status = !connected ? "Reconnecting to the arena…" : gameState.pausedAt ? "Game paused while a player reconnects." : me?.isAlive === false ? "You're out. Watch the remaining word warriors." : choosing ? isMyTurn ? "Choose a starting letter. Your choice will be locked." : `${playerName(activePlayer)} is choosing a starting letter.` : isMyTurn ? "Type the remaining letters. Your starting letters are locked." : `${playerName(activePlayer)} is finding a word.`;
   const history = (gameState.history || []).filter((entry) => entry.word && entry.accepted !== false).slice(-5);
 
   if (gameState.status === "ENDED") return <FinishWordResults gameState={gameState} myId={myId} connected={connected} onRematch={onRematch} />;
 
   return <div className={`screen finish-word-game ${isMyTurn ? "your-turn" : ""} ${viewport?.height <= 500 ? "compact" : ""}`}>
-    <header className="finish-word-game-heading"><div><span className="eyebrow">FINISH THE WORD</span><h1>{isMyTurn ? "Your move, " : "Keep the "}<span>{isMyTurn ? "word warrior." : "chain alive."}</span></h1></div><span className={`finish-word-difficulty ${gameState.hardMode ? "hard" : ""}`}>{gameState.hardMode ? "TWO LETTERS · HARD MODE" : `ONE LETTER · ${gameState.successfulTurns || 0}/${gameState.hardModeAfter || 10} TO HARD MODE`}</span></header>
+    <header className="finish-word-game-heading"><div><span className="eyebrow">FINISH THE WORD</span><h1>{isMyTurn ? "Your move, " : "Keep the "}<span>{isMyTurn ? "word warrior." : "chain alive."}</span></h1></div><span className={`finish-word-difficulty ${gameState.hardMode ? "hard" : ""}`}>{gameState.hardMode ? `${prefix.length === 2 ? "TWO LETTERS" : "ONE LETTER"} · RANDOM MODE` : `ONE LETTER · ${gameState.successfulTurns || 0}/${gameState.hardModeAfter || 10} TO RANDOM MODE`}</span></header>
     <div className="finish-word-game-layout">
       <FinishWordStage gameState={gameState} myId={myId} localWord={word} />
       <section className="finish-word-console" aria-label="Word controls">
         <div className="finish-word-turn-header"><span>{isMyTurn ? "YOUR TURN" : `${playerName(activePlayer)}'S TURN`}</span><strong className={remaining <= 3 ? "urgent" : ""} role="timer" aria-label={`${remaining} seconds remaining`}>{remaining}<small>s</small></strong></div>
         <div className="finish-word-time-track" aria-hidden="true"><span style={{ width: `${progress}%` }} /></div>
-        <div className="finish-word-prefix-prompt"><span>START YOUR WORD WITH</span><strong data-testid="required-prefix">{prefix.toUpperCase().split("").map((letter, index) => <span key={index}>{letter}</span>)}</strong><p>{gameState.lastWord ? <>Last word: <b>{gameState.lastWord.toUpperCase()}</b></> : "A new chain starts here."}</p></div>
+        <div className={`finish-word-prefix-prompt ${choosing ? "choosing" : ""}`}><span>{choosing ? isMyTurn ? "CHOOSE YOUR STARTING LETTER" : "WAITING FOR THE FIRST PLAYER" : "START YOUR WORD WITH"}</span>
+          <strong data-testid="required-prefix">{choosing ? isMyTurn ? (gameState.startingLetterChoices || []).map((letter) => <button type="button" key={letter} className="finish-word-letter-choice" aria-label={`Start with ${letter.toUpperCase()}`} disabled={!canChooseLetter || choosingLetter} onClick={() => chooseStartingLetter(letter)}>{letter.toUpperCase()}</button>) : <span>?</span> : prefix.toUpperCase().split("").map((letter, index) => <span key={index}>{letter}</span>)}</strong>
+          <p>{choosing ? isMyTurn ? "Pick one letter. It cannot be changed after selection." : `${playerName(activePlayer)} chooses the opening letter.` : gameState.lastWord ? <>Last word: <b>{gameState.lastWord.toUpperCase()}</b></> : "A new chain starts here."}</p>
+        </div>
         <div className="finish-word-chain" aria-label="Recent accepted words"><span>THE CHAIN SO FAR</span>{history.length ? <ol>{history.map((entry, index) => <li key={`${entry.turnId || index}:${entry.word}`}>{entry.word}<span aria-hidden="true">→</span></li>)}</ol> : <p>Make the first move.</p>}</div>
         <form className="finish-word-entry" onSubmit={submit}>
           <label htmlFor="finish-word-input">{isMyTurn ? "Your word" : "Watch the live word above the active player"}</label>
-          <div className={`finish-word-input-row ${error ? "invalid" : ""}`}><input id="finish-word-input" ref={inputRef} aria-label="Your word" aria-invalid={Boolean(error)} aria-describedby={error ? "finish-word-input-error" : undefined} value={word} onChange={(event) => changeWord(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && event.nativeEvent.isComposing) event.preventDefault(); }} disabled={!canPlay || pending} placeholder={isMyTurn ? `${prefix.toUpperCase()}…` : "Waiting for your turn"} maxLength={64} autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} enterKeyHint="send" /><button type="submit" disabled={!canPlay || pending || !word.trim()} aria-label="Submit word">{pending ? "…" : <span aria-hidden="true">→</span>}</button></div>
+          <div className={`finish-word-input-row ${error ? "invalid" : ""}`}>
+            <span className="finish-word-locked-prefix" data-testid="locked-prefix" aria-hidden="true">{prefix.toUpperCase()}</span>
+            <input id="finish-word-input" ref={inputRef} aria-label="Your word" aria-invalid={Boolean(error)} aria-describedby={`finish-word-prefix-help${error ? " finish-word-input-error" : ""}`} value={isMyTurn ? suffix : ""} onChange={(event) => changeWord(event.target.value)} onPaste={pasteWord} onKeyDown={(event) => { if (event.key === "Enter" && event.nativeEvent.isComposing) event.preventDefault(); }} disabled={!canPlay || pending} placeholder={choosing ? "Choose a letter first" : isMyTurn ? "" : "Waiting for your turn"} maxLength={64 - prefix.length} autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} enterKeyHint="send" />
+            <button type="submit" disabled={!canPlay || pending || word.length < 2} aria-label="Submit word">{pending ? "…" : <span aria-hidden="true">→</span>}</button>
+          </div>
+          <span id="finish-word-prefix-help" className="finish-word-prefix-help">{prefix ? `Your word starts with ${prefix.toUpperCase()}. These letters are locked. Type the remaining letters.` : "Choose your opening letter before typing."}</span>
           <p className="finish-word-turn-status" role="status">{status}</p>{error && <p id="finish-word-input-error" className="finish-word-error" role="alert">{error}</p>}
         </form>
         <p className="finish-word-input-hint">2+ letters · English words · no repeats</p>

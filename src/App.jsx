@@ -437,7 +437,7 @@ function WaitingScreen({
             <div className="room-settings-panel">
               <SectionHeading kicker="MATCH CONFIGURATION" title="Room settings" right={<IconLightning size={18} color="var(--cyan)" />} />
               <div className="room-mode-summary"><span>{gameTitle}</span><span>Up to {maxPlayers} players</span></div>
-              {isFinishWord ? <div className="room-settings-overview"><div><span>TURN TIMER</span><strong>15 seconds</strong></div><div><span>STARTING LIVES</span><strong>3 hearts per player</strong></div><div><span>WORD CHAIN</span><strong>Start with the last letter</strong></div><div><span>HARD MODE</span><strong>Last two letters after 10 words</strong></div><div><span>WIN CONDITION</span><strong>Last player standing</strong></div><small>Every word can be used once. Only a timeout costs a life. Invalid word? Try again while time remains.</small></div> : isColorCard ? <div className="room-settings-overview"><div><span>MEMORIZE</span><strong>5 seconds per card</strong></div>{isCreator ? <ColorCardSettings duration={colorDuration} count={colorCardCount} onDurationChange={onColorDurationChange} onCountChange={onColorCardCountChange} /> : <><div><span>TIME TO ANSWER EACH CARD</span><strong>{colorDuration === 60 ? "1 minute" : `${colorDuration} seconds`}</strong></div><div><span>NUMBER OF COLOR CARDS</span><strong>{colorCardCount}</strong></div></>}<div><span>SCORING</span><strong>Highest average accuracy wins</strong></div></div> : isCreator ? <div className="room-settings-grid"><label className="setting-field"><span className="field-label">TURN TIMER</span><select className="fun-input timer-select" value={turnDuration} onChange={handleTimerChange}><option value={0}>Unlimited</option><option value={30}>30 seconds</option><option value={45}>45 seconds</option><option value={60}>60 seconds</option></select></label><label className="setting-field"><span className="field-label">MATCH FORMAT</span><select className="fun-input timer-select" value={roundLimit} onChange={handleRoundLimitChange}><option value={1}>Single round</option><option value={3}>Best of 3</option><option value={5}>Best of 5</option></select></label></div> : <div className="room-settings-overview"><div><span>TURN TIMER</span><strong>{turnDuration ? `${turnDuration} seconds` : "Unlimited"}</strong></div><div><span>MATCH FORMAT</span><strong>{roundLimit === 1 ? "Single round" : `Best of ${roundLimit}`}</strong></div><small>The room creator controls these settings.</small></div>}
+              {isFinishWord ? <div className="room-settings-overview"><div><span>TURN TIMER</span><strong>15 seconds</strong></div><div><span>STARTING LIVES</span><strong>3 hearts per player</strong></div><div><span>WORD CHAIN</span><strong>Start with the last letter</strong></div><div><span>HARD MODE</span><strong>60% two letters after 10 words</strong></div><div><span>WIN CONDITION</span><strong>Last player standing</strong></div><small>Every word can be used once. Only a timeout costs a life. Invalid word? Try again while time remains.</small></div> : isColorCard ? <div className="room-settings-overview"><div><span>MEMORIZE</span><strong>5 seconds per card</strong></div>{isCreator ? <ColorCardSettings duration={colorDuration} count={colorCardCount} onDurationChange={onColorDurationChange} onCountChange={onColorCardCountChange} /> : <><div><span>TIME TO ANSWER EACH CARD</span><strong>{colorDuration === 60 ? "1 minute" : `${colorDuration} seconds`}</strong></div><div><span>NUMBER OF COLOR CARDS</span><strong>{colorCardCount}</strong></div></>}<div><span>SCORING</span><strong>Highest average accuracy wins</strong></div></div> : isCreator ? <div className="room-settings-grid"><label className="setting-field"><span className="field-label">TURN TIMER</span><select className="fun-input timer-select" value={turnDuration} onChange={handleTimerChange}><option value={0}>Unlimited</option><option value={30}>30 seconds</option><option value={45}>45 seconds</option><option value={60}>60 seconds</option></select></label><label className="setting-field"><span className="field-label">MATCH FORMAT</span><select className="fun-input timer-select" value={roundLimit} onChange={handleRoundLimitChange}><option value={1}>Single round</option><option value={3}>Best of 3</option><option value={5}>Best of 5</option></select></label></div> : <div className="room-settings-overview"><div><span>TURN TIMER</span><strong>{turnDuration ? `${turnDuration} seconds` : "Unlimited"}</strong></div><div><span>MATCH FORMAT</span><strong>{roundLimit === 1 ? "Single round" : `Best of ${roundLimit}`}</strong></div><small>The room creator controls these settings.</small></div>}
               <div className="settings-note"><IconShield size={15} color="currentColor" /> Fair play is the only rule that matters.</div>
             </div>
             <div className="waiting-log-section"><SectionHeading kicker="WHAT'S HAPPENING" title="Live activity" /><GameLogPanel log={gameLogs} className="waiting-room-log" emptyContent={<div className="log-row info"><span className="log-icon"><IconHourglass size={15} color="currentColor" /></span> Activity will show up here.</div>} /></div>
@@ -1607,6 +1607,11 @@ export default function App() {
       roster.current = state.players; setPlayers(state.players);
       if (state.creatorId) setCreatorId(state.creatorId);
     };
+    const handleStartingLetterChoices = ({ code, gameId, turnId, playerId, choices }) => {
+      if (code !== roomCode || playerId !== identity.current) return;
+      setGameState((previous) => previous?.gameMode === "finish-word" && previous.gameId === gameId && previous.turnId === turnId && previous.awaitingStartingLetterChoice
+        ? { ...previous, startingLetterChoices: choices } : previous);
+    };
     const handleFinishTyping = ({ code, gameId, turnId, playerId, text }) => {
       if (code !== roomCode) return;
       setGameState((previous) => previous?.gameMode === "finish-word" && previous.gameId === gameId && previous.turnId === turnId && previous.currentPlayerId === playerId
@@ -1654,6 +1659,7 @@ export default function App() {
     sock.on("ROOM_RESUMED", handleRoomResumed);
     sock.on("ROOM_KICK_VOTES", handleKickVotes);
     sock.on("character_selected", handleCharacterSelected);
+    sock.on("starting_letter_choices", handleStartingLetterChoices);
     sock.on("turn_start", handleFinishState);
     sock.on("game_state", handleFinishState);
     sock.on("game_over", handleFinishState);
@@ -1684,6 +1690,7 @@ export default function App() {
       sock.off("ROOM_RESUMED", handleRoomResumed);
       sock.off("ROOM_KICK_VOTES", handleKickVotes);
       sock.off("character_selected", handleCharacterSelected);
+      sock.off("starting_letter_choices", handleStartingLetterChoices);
       sock.off("turn_start", handleFinishState);
       sock.off("game_state", handleFinishState);
       sock.off("game_over", handleFinishState);

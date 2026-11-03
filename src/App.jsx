@@ -10,7 +10,7 @@ import useToasts from "./hooks/useToasts.js";
 import { readRoomSession, saveRoomSession, clearRoomSession } from "./roomSession.js";
 import ModalOverlay from "./components/ModalOverlay.jsx";
 import { ColorCardGameView, ColorCardResultsView } from "./components/ColorCard.jsx";
-import { FinishWordLobby, FinishWordGameView } from "./components/FinishWord.jsx";
+import { FINISH_WORD_CHARACTERS, FinishWordCharacter, FinishWordCharacterPicker, FinishWordGameView } from "./components/FinishWord.jsx";
 import {
   IconSword,
   IconShield,
@@ -278,13 +278,26 @@ function WaitingScreen({
   onRoundLimitChange,
   onFeedback,
   recoveryCategory,
+  connected,
 }) {
   const [countdown, setCountdown] = useState(null);
   const [showSlotMachine, setShowSlotMachine] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [copied, setCopied] = useState(false);
+  const [pending, setPending] = useState(null);
+  const [error, setError] = useState("");
+  const activeRequest = useRef(false);
   const myPlayer = players.find((p) => p.id === myId);
   const imReady = Boolean(myPlayer?.ready);
+  const isColorCard = gameMode === "color-card";
+  const isFinishWord = gameMode === "finish-word";
+  const gameTitle = isFinishWord ? "Finish the Word" : isColorCard ? "Color Card" : "Word Duel";
+  const hasTwoPlayers = players.length >= 2;
+  const isPlayerReady = (player) => player.ready && player.connected !== false && (!isFinishWord || Boolean(player.characterId));
+  const allReady = hasTwoPlayers && players.every(isPlayerReady);
+  useEffect(() => {
+    if (isFinishWord && (!allReady || !connected)) setCountdown(null);
+  }, [isFinishWord, allReady, connected]);
   useEffect(() => {
     if (recoveryCategory) { setSelectedCategory(recoveryCategory); setShowSlotMachine(true); }
   }, [recoveryCategory]);
@@ -313,8 +326,31 @@ function WaitingScreen({
     } catch { onFeedback(`Could not copy. Your room code is ${code}.`, "error"); }
   };
 
+  const actFinishWord = async (event, data, key) => {
+    if (!connected || activeRequest.current) return;
+    activeRequest.current = true;
+    setPending(key);
+    setError("");
+    try {
+      const response = await getSocket().timeout(5000).emitWithAck(event, { code, ...data });
+      if (!response?.success) throw new Error(response?.message || "Could not complete that action.");
+      if (event === "select_character") {
+        const character = FINISH_WORD_CHARACTERS.find((candidate) => candidate.id === data.characterId);
+        onFeedback(`You chose ${character.name}.`, "success");
+      }
+    } catch (failure) {
+      const message = failure?.message?.includes("timed out") ? "No confirmation received. Please try again." : failure.message;
+      setError(message);
+      onFeedback(message, "error");
+    } finally {
+      activeRequest.current = false;
+      setPending(null);
+    }
+  };
+
   const handleReady = () => {
-    getSocket().emit("toggle-ready", { code });
+    if (isFinishWord) actFinishWord("toggle-ready", {}, "ready");
+    else getSocket().emit("toggle-ready", { code });
   };
 
   const handleTimerChange = (event) => {
@@ -367,15 +403,12 @@ function WaitingScreen({
     };
   }, [onGameStart]);
 
-  const hasTwoPlayers = players.length >= 2;
-  const isColorCard = gameMode === "color-card";
-
   return (
-    <div className="screen waiting-screen">
+    <div className={`screen waiting-screen${isFinishWord ? " finish-word-lobby" : ""}`}>
       <div className="waiting-layout-container">
-        <div className="page-intro waiting-intro"><div><span className="eyebrow"><IconShield size={16} color="currentColor" /> {isColorCard ? "COLOR CARD" : "WORD DUEL"} LOBBY</span><h1>Prepare to <span>play.</span></h1><p>{isColorCard ? `${colorCardCount} unique shared color${colorCardCount === 1 ? "" : "s"}. Memorize each for 5 seconds, then recreate it in ${colorDuration} seconds. The server moves everyone through results and rankings together.` : "Investigate the next player’s secret word in lobby order. Turns rotate through everyone."}</p></div><div className="lobby-state-chip"><span className="pulse-dot" /> {hasTwoPlayers ? "PLAYERS ASSEMBLED" : "WAITING FOR CHALLENGER"}</div></div>
+        <div className="page-intro waiting-intro"><div><span className="eyebrow"><IconShield size={16} color="currentColor" /> {gameTitle.toUpperCase()} LOBBY</span><h1>Prepare to <span>play.</span></h1><p>{isFinishWord ? "Choose your character, then ready up. Keep the word chain alive in 15-second turns. Last player standing wins." : isColorCard ? `${colorCardCount} unique shared color${colorCardCount === 1 ? "" : "s"}. Memorize each for 5 seconds, then recreate it in ${colorDuration} seconds. The server moves everyone through results and rankings together.` : "Investigate the next player’s secret word in lobby order. Turns rotate through everyone."}</p></div><div className="lobby-state-chip"><span className="pulse-dot" /> {hasTwoPlayers ? "PLAYERS ASSEMBLED" : "WAITING FOR CHALLENGER"}</div></div>
         <div className="ready-journey" aria-label="Match preparation progress">
-          <div className="journey-step done"><span>01</span> ROOM CREATED</div><div className={`journey-line ${hasTwoPlayers ? "done" : ""}`} /><div className={`journey-step ${hasTwoPlayers ? "done" : ""}`}><span>02</span> PLAYERS JOINED</div><div className={`journey-line ${players.every(p=>p.ready) && hasTwoPlayers ? "done" : ""}`} /><div className={`journey-step ${players.every(p=>p.ready) && hasTwoPlayers ? "done" : ""}`}><span>03</span> ALL READY</div>
+          <div className="journey-step done"><span>01</span> ROOM CREATED</div><div className={`journey-line ${hasTwoPlayers ? "done" : ""}`} /><div className={`journey-step ${hasTwoPlayers ? "done" : ""}`}><span>02</span> PLAYERS JOINED</div><div className={`journey-line ${allReady ? "done" : ""}`} /><div className={`journey-step ${allReady ? "done" : ""}`}><span>03</span> ALL READY</div>
         </div>
         <div className="waiting-grid">
           <div className="waiting-main">
@@ -386,30 +419,32 @@ function WaitingScreen({
             </button>
             <div className="player-panel">
               <SectionHeading kicker="YOUR ROOM" title="Player lineup" right={<span className="player-capacity">{players.length} / {maxPlayers} PLAYERS</span>} />
-              <div className="player-slots">
-                {Array.from({ length: maxPlayers }, (_, index) => index).map((i) => { const p = players[i]; const [c1, c2] = avatarGrad(i); return <div key={i} className={`player-card ${p ? "filled" : "empty"} ${p?.ready ? "ready-yes" : ""}`}>
-                  <div className="player-avatar-fun" style={p ? { background: `linear-gradient(135deg,${c1},${c2})` } : {}}>{p ? p.username[0].toUpperCase() : "?"}</div>
-                  <div className="player-ident"><div className="player-name-fun"><span className="player-display-name">{p ? p.username : "Awaiting challenger"}</span>{p?.id === myId && <span className="you-tag">YOU</span>}{p?.isBot && <span className="you-tag">BOT</span>}{p?.connected === false && <span className="player-connection-tag status-reconnecting">Reconnecting</span>}</div><div className="player-meta-row">{p ? isColorCard ? <span className="player-accuracy-stat" title={p.previousMatchCardCount ? `Average accuracy from the previous completed match (${p.previousMatchCardCount} cards)` : "No previous match recorded"}><IconTarget size={13} color="currentColor" /><strong>{(p.previousMatchAverageAccuracy ?? 0).toFixed(2)}%</strong> LAST MATCH AVG.</span> : <span><IconTrophy size={13} color="currentColor" /> {p.wins || 0} WINS</span> : <span>SHARE YOUR INVITE CODE ABOVE</span>}</div></div>
-                  {p ? <span className={`ready-pill ${p.ready ? "yes" : "no"}`}>{p.ready ? <><IconCheck size={13} color="currentColor" /> READY</> : "NOT READY"}</span> : <span className="empty-player-pulse"><span className="pulse-dot" /></span>}
+              <div className="player-slots" aria-label="Room players">
+                {Array.from({ length: maxPlayers }, (_, index) => index).map((i) => { const p = players[i]; const [c1, c2] = avatarGrad(i); const ready = p && isPlayerReady(p); return <div key={i} className={`player-card ${p ? "filled" : "empty"} ${ready ? "ready-yes" : ""}`}>
+                  <div className="player-avatar-fun" style={p ? { background: `linear-gradient(135deg,${c1},${c2})` } : {}}>{isFinishWord && p?.characterId ? <FinishWordCharacter characterId={p.characterId} decorative /> : p ? p.username[0].toUpperCase() : "?"}</div>
+                  <div className="player-ident"><div className="player-name-fun"><span className="player-display-name">{p ? p.username : "Awaiting challenger"}</span>{p?.id === myId && <span className="you-tag">YOU</span>}{p?.isBot && <span className="you-tag">BOT</span>}{p?.connected === false && <span className="player-connection-tag status-reconnecting">Reconnecting</span>}</div><div className="player-meta-row">{p ? isFinishWord ? <span>{FINISH_WORD_CHARACTERS.find((character) => character.id === p.characterId)?.name || "Choosing a character…"}</span> : isColorCard ? <span className="player-accuracy-stat" title={p.previousMatchCardCount ? `Average accuracy from the previous completed match (${p.previousMatchCardCount} cards)` : "No previous match recorded"}><IconTarget size={13} color="currentColor" /><strong>{(p.previousMatchAverageAccuracy ?? 0).toFixed(2)}%</strong> LAST MATCH AVG.</span> : <span><IconTrophy size={13} color="currentColor" /> {p.wins || 0} WINS</span> : <span>SHARE YOUR INVITE CODE ABOVE</span>}</div></div>
+                  {p ? <span className={`ready-pill ${ready ? "yes" : "no"}`}>{ready ? <><IconCheck size={13} color="currentColor" /> READY</> : "NOT READY"}</span> : <span className="empty-player-pulse"><span className="pulse-dot" /></span>}
                 </div>; })}
               </div>
-              <ProgressBar value={players.filter((p)=>p.ready).length} max={Math.max(2, players.length)} label="Players ready" color="mint" />
-              {hasTwoPlayers ? <button className={`btn-ready-fun ${imReady ? "is-ready" : "not-ready"}`} onClick={handleReady}><IconShield size={21} color="currentColor" /> {imReady ? "You're ready — tap to cancel" : "I'm ready to battle"} <span className="action-arrow">↗</span></button> : <div className="invite-nudge"><span className="pulse-dot" /> Invite someone to join your room.</div>}
-              {hasTwoPlayers && !players.every((p)=>p.ready) && countdown === null && <div className="ready-caption">All joined players must hit ready to start. At least two players are required.</div>}
+              <ProgressBar value={players.filter(isPlayerReady).length} max={Math.max(2, players.length)} label="Players ready" color="mint" />
+              {hasTwoPlayers ? <button type="button" className={`btn-ready-fun ${imReady ? "is-ready" : "not-ready"}`} aria-pressed={imReady} disabled={!connected || (isFinishWord && (!myPlayer?.characterId || pending !== null))} onClick={handleReady}><IconShield size={21} color="currentColor" /> {pending === "ready" ? "Updating…" : imReady ? "You're ready — tap to cancel" : "I'm ready to battle"} <span className="action-arrow" aria-hidden="true">↗</span></button> : <div className="invite-nudge"><span className="pulse-dot" /> Invite someone to join your room.</div>}
+              {hasTwoPlayers && !allReady && countdown === null && <div className="ready-caption" role="status">{isFinishWord && !myPlayer?.characterId ? "Choose a character, then ready up." : "All joined players must hit ready to start. At least two players are required."}</div>}
+              {error && <p className="finish-word-error" role="alert">{error}</p>}
             </div>
           </div>
           <aside className="waiting-side">
+            {isFinishWord && <FinishWordCharacterPicker players={players} myId={myId} connected={connected} pending={pending} onSelect={(character) => actFinishWord("select_character", { characterId: character.id }, character.id)} />}
             <div className="room-settings-panel">
               <SectionHeading kicker="MATCH CONFIGURATION" title="Room settings" right={<IconLightning size={18} color="var(--cyan)" />} />
-              <div className="room-mode-summary"><span>{isColorCard ? "Color Card" : "Word Duel"}</span><span>Up to {maxPlayers} players</span></div>
-              {isColorCard ? <div className="room-settings-overview"><div><span>MEMORIZE</span><strong>5 seconds per card</strong></div>{isCreator ? <ColorCardSettings duration={colorDuration} count={colorCardCount} onDurationChange={onColorDurationChange} onCountChange={onColorCardCountChange} /> : <><div><span>TIME TO ANSWER EACH CARD</span><strong>{colorDuration === 60 ? "1 minute" : `${colorDuration} seconds`}</strong></div><div><span>NUMBER OF COLOR CARDS</span><strong>{colorCardCount}</strong></div></>}<div><span>SCORING</span><strong>Highest average accuracy wins</strong></div></div> : isCreator ? <div className="room-settings-grid"><label className="setting-field"><span className="field-label">TURN TIMER</span><select className="fun-input timer-select" value={turnDuration} onChange={handleTimerChange}><option value={0}>Unlimited</option><option value={30}>30 seconds</option><option value={45}>45 seconds</option><option value={60}>60 seconds</option></select></label><label className="setting-field"><span className="field-label">MATCH FORMAT</span><select className="fun-input timer-select" value={roundLimit} onChange={handleRoundLimitChange}><option value={1}>Single round</option><option value={3}>Best of 3</option><option value={5}>Best of 5</option></select></label></div> : <div className="room-settings-overview"><div><span>TURN TIMER</span><strong>{turnDuration ? `${turnDuration} seconds` : "Unlimited"}</strong></div><div><span>MATCH FORMAT</span><strong>{roundLimit === 1 ? "Single round" : `Best of ${roundLimit}`}</strong></div><small>The room creator controls these settings.</small></div>}
+              <div className="room-mode-summary"><span>{gameTitle}</span><span>Up to {maxPlayers} players</span></div>
+              {isFinishWord ? <div className="room-settings-overview"><div><span>TURN TIMER</span><strong>15 seconds</strong></div><div><span>STARTING LIVES</span><strong>3 hearts per player</strong></div><div><span>WORD CHAIN</span><strong>Start with the last letter</strong></div><div><span>HARD MODE</span><strong>Last two letters after 10 words</strong></div><div><span>WIN CONDITION</span><strong>Last player standing</strong></div><small>Every word can be used once. Only a timeout costs a life. Invalid word? Try again while time remains.</small></div> : isColorCard ? <div className="room-settings-overview"><div><span>MEMORIZE</span><strong>5 seconds per card</strong></div>{isCreator ? <ColorCardSettings duration={colorDuration} count={colorCardCount} onDurationChange={onColorDurationChange} onCountChange={onColorCardCountChange} /> : <><div><span>TIME TO ANSWER EACH CARD</span><strong>{colorDuration === 60 ? "1 minute" : `${colorDuration} seconds`}</strong></div><div><span>NUMBER OF COLOR CARDS</span><strong>{colorCardCount}</strong></div></>}<div><span>SCORING</span><strong>Highest average accuracy wins</strong></div></div> : isCreator ? <div className="room-settings-grid"><label className="setting-field"><span className="field-label">TURN TIMER</span><select className="fun-input timer-select" value={turnDuration} onChange={handleTimerChange}><option value={0}>Unlimited</option><option value={30}>30 seconds</option><option value={45}>45 seconds</option><option value={60}>60 seconds</option></select></label><label className="setting-field"><span className="field-label">MATCH FORMAT</span><select className="fun-input timer-select" value={roundLimit} onChange={handleRoundLimitChange}><option value={1}>Single round</option><option value={3}>Best of 3</option><option value={5}>Best of 5</option></select></label></div> : <div className="room-settings-overview"><div><span>TURN TIMER</span><strong>{turnDuration ? `${turnDuration} seconds` : "Unlimited"}</strong></div><div><span>MATCH FORMAT</span><strong>{roundLimit === 1 ? "Single round" : `Best of ${roundLimit}`}</strong></div><small>The room creator controls these settings.</small></div>}
               <div className="settings-note"><IconShield size={15} color="currentColor" /> Fair play is the only rule that matters.</div>
             </div>
             <div className="waiting-log-section"><SectionHeading kicker="WHAT'S HAPPENING" title="Live activity" /><GameLogPanel log={gameLogs} className="waiting-room-log" emptyContent={<div className="log-row info"><span className="log-icon"><IconHourglass size={15} color="currentColor" /></span> Activity will show up here.</div>} /></div>
           </aside>
         </div>
       </div>
-      {countdown !== null && <ModalOverlay className="countdown-overlay" role="status"><div className="countdown-card"><span className="eyebrow">GET READY</span><div className="countdown-num" key={countdown}>{countdown}</div><div className="countdown-label-fun"><IconLightning size={19} color="currentColor" /> {isColorCard ? "COLOR CARD STARTING" : "DUEL STARTING"}</div></div></ModalOverlay>}
+      {countdown !== null && <ModalOverlay className="countdown-overlay" role="status"><div className="countdown-card"><span className="eyebrow">GET READY</span><div className="countdown-num" key={countdown}>{countdown}</div><div className="countdown-label-fun"><IconLightning size={19} color="currentColor" /> {isFinishWord ? "FINISH THE WORD STARTING" : isColorCard ? "COLOR CARD STARTING" : "DUEL STARTING"}</div></div></ModalOverlay>}
       {showSlotMachine && selectedCategory && <SlotMachine selectedCategoryName={selectedCategory} onDone={handleSlotMachineDone} />}
     </div>
   );
@@ -1755,9 +1790,7 @@ export default function App() {
 
   let currentView = null;
   if (screen === "lobby") currentView = <LobbyScreen onCreated={handleRoomCreated} onJoined={handleRoomJoined} connected={connected} gameMode={selectedMode} onModeChange={setSelectedMode} onFeedback={showFeedback} />;
-  else if (screen === "waiting") currentView = gameMode === "finish-word"
-    ? <FinishWordLobby code={roomCode} players={players} myId={myId} creatorId={creatorId} maxPlayers={maxPlayers} socket={getSocket()} connected={connected && !restoring} onFeedback={showFeedback} />
-    : <WaitingScreen code={roomCode} players={players} myId={myId} gameMode={gameMode} maxPlayers={maxPlayers} colorDuration={colorDuration} onColorDurationChange={handleColorDurationChange} colorCardCount={colorCardCount} onColorCardCountChange={handleColorCardCountChange} gameLogs={gameLogs} onGameStart={handleGameStart} turnDuration={turnDuration} roundLimit={roundLimit} isCreator={creatorId === myId} onTurnDurationChange={handleTurnDurationChange} onRoundLimitChange={handleRoundLimitChange} onFeedback={showFeedback} recoveryCategory={recoveryCategory} />;
+  else if (screen === "waiting") currentView = <WaitingScreen code={roomCode} players={players} myId={myId} gameMode={gameMode} maxPlayers={maxPlayers} colorDuration={colorDuration} onColorDurationChange={handleColorDurationChange} colorCardCount={colorCardCount} onColorCardCountChange={handleColorCardCountChange} gameLogs={gameLogs} onGameStart={handleGameStart} turnDuration={turnDuration} roundLimit={roundLimit} isCreator={creatorId === myId} onTurnDurationChange={handleTurnDurationChange} onRoundLimitChange={handleRoundLimitChange} onFeedback={showFeedback} recoveryCategory={recoveryCategory} connected={connected && !restoring} />;
   else if (screen === "game" && gameState) currentView = gameMode === "color-card"
     ? <ColorCardGameView key={gameState.roundId} gameState={gameState} socket={getSocket()} myId={myId} connected={connected} onFeedback={showFeedback} />
     : gameMode === "finish-word" ? <FinishWordGameView gameState={gameState} myId={myId} socket={getSocket()} connected={connected && !restoring} onFeedback={showFeedback} onRematch={handleRematch} />

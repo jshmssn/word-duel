@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import useFinishWord from "../hooks/useFinishWord.js";
 import useVisualViewport from "../hooks/useVisualViewport.js";
-import ModalOverlay from "./ModalOverlay.jsx";
+import { SectionHeading } from "./Experience.jsx";
 import "./FinishWord.css";
 
 export const FINISH_WORD_CHARACTERS = Object.freeze([
@@ -106,74 +106,25 @@ export function FinishWordHearts({ lives = 3, className = "" }) {
   </span>;
 }
 
-export function FinishWordLobby({ code, players, myId, creatorId, maxPlayers = 8, socket, connected, onFeedback }) {
-  const [pending, setPending] = useState(null);
-  const [error, setError] = useState("");
-  const [countdown, setCountdown] = useState(null);
-  const activeRequest = useRef(false);
+export function FinishWordCharacterPicker({ players, myId, connected, pending, onSelect }) {
   const me = players.find((player) => player.id === myId);
-  const allReady = connected && players.length >= 2 && players.length <= maxPlayers &&
-    players.every((player) => player.ready && player.characterId && player.connected !== false);
 
-  useEffect(() => {
-    const update = ({ count }) => setCountdown(count);
-    const cancel = () => setCountdown(null);
-    socket.on("countdown", update); socket.on("countdown-cancel", cancel);
-    return () => { socket.off("countdown", update); socket.off("countdown-cancel", cancel); };
-  }, [socket]);
-
-  useEffect(() => { if (!allReady) setCountdown(null); }, [allReady]);
-
-  async function act(event, data, key) {
-    if (!connected || activeRequest.current) return;
-    activeRequest.current = true; setPending(key); setError("");
-    try {
-      const response = await socket.timeout(5000).emitWithAck(event, { code, ...data });
-      if (!response?.success) throw new Error(response?.message || "Could not complete that action.");
-      if (event === "select_character") onFeedback(`You chose ${characterFor(data.characterId).name}.`, "success");
-    } catch (failure) {
-      const message = failure?.message?.includes("timed out") ? "No confirmation received. Please try again." : failure.message;
-      setError(message); onFeedback(message, "error");
-    } finally { activeRequest.current = false; setPending(null); }
-  }
-
-  async function copyCode() {
-    try { await navigator.clipboard.writeText(code); onFeedback("Room code copied. Invite your friends!", "success"); }
-    catch { onFeedback(`Your room code is ${code}.`, "info"); }
-  }
-
-  return <div className="screen finish-word-lobby">
-    <div className="finish-word-lobby-heading"><div><span className="eyebrow">FINISH THE WORD · THE CAST</span><h1>Pick your <span>word warrior.</span></h1><p>Eight characters. One of each. Choose yours before someone else does.</p></div><button type="button" className="finish-word-room-code" onClick={copyCode} aria-label={`Copy room code ${code}`}><small>INVITE CODE</small><strong>{code}</strong><span>Tap to copy ↗</span></button></div>
-    <div className="finish-word-lobby-layout">
-      <section className="finish-word-roster-panel" aria-label="Choose your character">
-        <div className="finish-word-panel-title"><h2>Choose your character</h2><span>{me?.characterId ? "Your character is reserved" : "Make it yours"}</span></div>
-        <div className="finish-word-character-grid">
-          {FINISH_WORD_CHARACTERS.map((character) => {
-            const owner = players.find((player) => player.characterId === character.id);
-            const selected = owner?.id === myId;
-            const locked = Boolean(owner && !selected);
-            return <button key={character.id} type="button" data-testid={`character-${character.id}`} className={`finish-word-character-option ${selected ? "selected" : ""} ${locked ? "locked" : ""}`} style={{ "--character-color": character.color }} aria-label={locked ? `${character.name}, taken by ${playerName(owner)}` : selected ? `${character.name}, your selected character` : `Choose ${character.name}`} aria-pressed={selected} disabled={locked || !connected || pending !== null} onClick={() => act("select_character", { characterId: character.id }, character.id)}>
-              <span className="finish-word-character-lock" aria-hidden="true">{selected ? "✓ YOURS" : locked ? "LOCKED" : "AVAILABLE"}</span>
-              <FinishWordCharacter characterId={character.id} decorative />
-              <strong>{character.name}</strong><span className="finish-word-character-owner">{owner ? selected ? "Your character" : playerName(owner) : character.detail}</span>
-            </button>;
-          })}
-        </div>
-        {error && <p className="finish-word-error" role="alert">{error}</p>}
-      </section>
-      <aside className="finish-word-lobby-sidebar">
-        <section className="finish-word-party-panel"><div className="finish-word-panel-title"><h2>The lineup</h2><span>{players.length} / {maxPlayers}</span></div><ul className="finish-word-party-list" aria-label="Room players">{players.map((player) => <li key={player.id}>
-          <span className="finish-word-party-avatar">{player.characterId ? <FinishWordCharacter characterId={player.characterId} decorative /> : <span aria-hidden="true">?</span>}</span>
-          <div><strong>{playerName(player)}{player.id === myId && <small>YOU</small>}</strong><span>{player.connected === false ? "Reconnecting" : player.characterId ? characterFor(player.characterId).name : "Choosing a character…"}</span><span className={`finish-word-ready-status ${player.ready && player.connected !== false ? "ready" : ""}`}>{player.connected === false ? "Not ready" : player.ready ? "Ready" : "Not ready"}</span></div>
-          {player.id === creatorId && <span className="finish-word-host-tag">HOST</span>}
-        </li>)}</ul></section>
-        <section className="finish-word-briefing"><span className="eyebrow">THE RULES ARE SIMPLE</span><h2>Keep the word alive.</h2><div><strong>15s</strong><p>to find a valid word on your turn</p></div><div><FinishWordHearts lives={3} /><p>Only a timeout costs one life. Invalid word? Try again while time remains.</p></div><p>Start with the last letter. After 10 accepted words, match the last <strong>two</strong>. Every word can be used once.</p><p>Last player standing wins.</p></section>
-        <button type="button" className={`btn-ready-fun ${me?.ready ? "is-ready" : "not-ready"} finish-word-ready-button`} aria-pressed={Boolean(me?.ready)} disabled={!connected || !me?.characterId || pending !== null} onClick={() => act("toggle-ready", {}, "ready")}>{pending === "ready" ? "Updating…" : me?.ready ? "Not ready" : "Ready up"}</button>
-        <p className="finish-word-lobby-wait" role="status">{players.length < 2 ? "Invite at least one other player to start." : !me?.characterId ? "Choose a character, then ready up." : allReady ? "Everyone is ready. The game starts automatically!" : me.ready ? "You're ready. Waiting for everyone else to ready up." : "Everyone must choose a character and ready up. The game starts automatically."}</p>
-      </aside>
+  return <section className="room-settings-panel finish-word-roster-panel" aria-label="Choose your character">
+    <SectionHeading kicker="YOUR CHARACTER" title="Choose your character" />
+    <p className="finish-word-character-hint">{me?.characterId ? "Your character is reserved. Ready up when you're set." : "Eight characters. One of each. Choose yours, then ready up."}</p>
+    <div className="finish-word-character-grid">
+      {FINISH_WORD_CHARACTERS.map((character) => {
+        const owner = players.find((player) => player.characterId === character.id);
+        const selected = owner?.id === myId;
+        const locked = Boolean(owner && !selected);
+        return <button key={character.id} type="button" data-testid={`character-${character.id}`} className={`finish-word-character-option ${selected ? "selected" : ""} ${locked ? "locked" : ""}`} style={{ "--character-color": character.color }} aria-label={locked ? `${character.name}, taken by ${playerName(owner)}` : selected ? `${character.name}, your selected character` : `Choose ${character.name}`} aria-pressed={selected} disabled={locked || !connected || pending !== null} onClick={() => onSelect(character)}>
+          <span className="finish-word-character-lock" aria-hidden="true">{selected ? "✓ YOURS" : locked ? "LOCKED" : "AVAILABLE"}</span>
+          <FinishWordCharacter characterId={character.id} decorative />
+          <strong>{character.name}</strong><span className="finish-word-character-owner">{owner ? selected ? "Your character" : playerName(owner) : character.detail}</span>
+        </button>;
+      })}
     </div>
-    {countdown !== null && <ModalOverlay className="countdown-overlay" role="status"><div className="countdown-card"><span className="eyebrow">GET READY</span><div className="countdown-num" key={countdown}>{countdown}</div><div className="countdown-label-fun">FINISH THE WORD STARTING</div></div></ModalOverlay>}
-  </div>;
+  </section>;
 }
 
 function FinishWordStage({ gameState, myId, localWord }) {

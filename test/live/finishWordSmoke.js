@@ -44,7 +44,7 @@ try {
   await host.getByLabel("PLAYER NAME").fill("Host Warrior");
   await host.getByRole("button", { name: /Create Finish the Word room/ }).click();
   await expect(host.getByTestId("character-knight")).toBeVisible();
-  const code = await host.locator(".finish-word-room-code strong").innerText();
+  const code = await host.locator(".room-code-chars").innerText();
   await guest.goto(url);
   await guest.getByLabel("PLAYER NAME").fill("Guest Warrior");
   await guest.getByRole("tab", { name: "Join room", exact: true }).click();
@@ -55,8 +55,8 @@ try {
   await expect(guest.getByTestId("character-knight")).toBeDisabled();
   await guest.getByTestId("character-wizard").click();
   await expect(host.getByRole("button", { name: "Start Finish the Word" })).toHaveCount(0);
-  await host.getByRole("button", { name: "Ready up", exact: true }).click();
-  await guest.getByRole("button", { name: "Ready up", exact: true }).click();
+  await host.getByRole("button", { name: "I'm ready to battle", exact: true }).click();
+  await guest.getByRole("button", { name: "I'm ready to battle", exact: true }).click();
   await expect(host.locator(".countdown-overlay")).toBeVisible();
   const hostInput = host.getByRole("textbox", { name: "Your word" });
   const guestInput = guest.getByRole("textbox", { name: "Your word" });

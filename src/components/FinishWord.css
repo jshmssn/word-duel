@@ -1,18 +1,9 @@
-.finish-word-lobby, .finish-word-results { max-width: 1180px; width: 100%; margin-inline: auto; }
-.finish-word-lobby-heading { display: flex; justify-content: space-between; align-items: center; gap: 24px; margin-bottom: 30px; }
-.finish-word-lobby-heading h1, .finish-word-results h1 { margin: 10px 0; font: 700 clamp(29px, 4vw, 46px)/1.12 var(--font-display); letter-spacing: -1.5px; }
-.finish-word-lobby-heading h1 > span, .finish-word-results h1 > span { color: var(--mint); }
-.finish-word-lobby-heading p { margin: 0; color: var(--muted); font-size: 13px; }
-.finish-word-room-code { flex: none; padding: 16px 22px; display: grid; gap: 4px; text-align: left; border: 1px solid #527783; border-radius: 16px; background: #17343b; }
-.finish-word-room-code small { color: #90b6bd; font: 700 9px var(--font-mono); letter-spacing: 1.4px; }
-.finish-word-room-code strong { color: #bcffe2; font: 700 22px var(--font-mono); letter-spacing: 2px; }
-.finish-word-room-code > span { color: #afd7cf; font-size: 10px; }
-.finish-word-lobby-layout { display: grid; grid-template-columns: minmax(0, 1fr) 295px; gap: 22px; align-items: start; }
-.finish-word-roster-panel, .finish-word-party-panel, .finish-word-briefing { padding: 22px; border: 1px solid #364765; border-radius: 20px; background: #152039; }
-.finish-word-panel-title { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-.finish-word-panel-title h2 { margin: 0; font: 700 18px var(--font-display); letter-spacing: -.5px; }
-.finish-word-panel-title > span { color: var(--muted); font: 600 10px var(--font-mono); }
-.finish-word-character-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.finish-word-results { max-width: 1180px; width: 100%; margin-inline: auto; }
+.finish-word-results h1 { margin: 10px 0; font: 700 clamp(29px, 4vw, 46px)/1.12 var(--font-display); letter-spacing: -1.5px; }
+.finish-word-results h1 > span { color: var(--mint); }
+.finish-word-character-hint { margin: 0 0 18px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.finish-word-character-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.player-avatar-fun > .finish-word-character { width: 38px; height: 43px; }
 .finish-word-character-option { min-width: 0; position: relative; padding: 29px 10px 13px; border: 1px solid #445471; border-radius: 15px; background: radial-gradient(ellipse at 50% 45%, color-mix(in srgb, var(--character-color) 12%, transparent), transparent 75%), #1c2a43; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; overflow: hidden; }
 .finish-word-character-option:hover:not(:disabled) { border-color: var(--character-color); transform: translateY(-3px); background-color: #253650; }
 .finish-word-character-option.selected { border: 2px solid var(--mint); padding: 28px 9px 12px; background-color: #1a3e3e; box-shadow: 0 0 0 3px #6ee9b914; }
@@ -23,28 +14,6 @@
 .finish-word-character-lock { position: absolute; top: 11px; left: 0; right: 0; color: #8696b1; font: 700 8px var(--font-mono); letter-spacing: 1px; }
 .selected .finish-word-character-lock { color: var(--mint); }
 .finish-word-character-owner { display: block; min-height: 28px; max-width: 100%; color: #a1aec7; font-size: 9px; line-height: 1.5; overflow-wrap: anywhere; }
-.finish-word-lobby-sidebar { display: grid; gap: 18px; }
-.finish-word-party-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 13px; }
-.finish-word-party-list li { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.finish-word-party-avatar { width: 42px; height: 45px; display: grid; place-items: center; flex: none; border-radius: 10px; background: #26364f; color: #657b9e; font: 700 22px var(--font-display); }
-.finish-word-party-avatar .finish-word-character { width: 38px; height: 43px; }
-.finish-word-party-list li > div { min-width: 0; flex: 1; }
-.finish-word-party-list strong { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; font: 700 12px var(--font-display); overflow-wrap: anywhere; }
-.finish-word-party-list strong > small { color: var(--mint); font: 700 7px var(--font-mono); }
-.finish-word-party-list li > div > span { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
-.finish-word-host-tag { flex: none; font: 700 7px var(--font-mono); color: var(--yellow); }
-.finish-word-party-list li > div > .finish-word-ready-status { color: #a1aec7; font: 700 9px var(--font-mono); }
-.finish-word-party-list li > div > .finish-word-ready-status.ready { color: var(--mint); }
-.finish-word-ready-button { width: 100%; }
-.finish-word-briefing { background: linear-gradient(145deg, #263443, #18253a); }
-.finish-word-briefing .eyebrow { font-size: 8px; letter-spacing: 1px; }
-.finish-word-briefing h2 { font: 700 21px var(--font-display); margin: 10px 0 16px; letter-spacing: -.5px; }
-.finish-word-briefing > div { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
-.finish-word-briefing > div > strong { min-width: 48px; font: 700 28px var(--font-display); color: var(--mint); }
-.finish-word-briefing p { color: #a6b6cd; font-size: 11px; line-height: 1.7; margin: 0 0 9px; }
-.finish-word-briefing > div p { margin: 0; }
-.finish-word-start { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; font-size: 13px; }
-.finish-word-lobby-wait { color: var(--muted); text-align: center; font-size: 11px; margin: 0; }
 .finish-word-hearts { display: inline-flex; align-items: center; justify-content: center; gap: 4px; flex: none; }
 .finish-word-hearts svg { display: block; width: 15px; height: 15px; overflow: visible; }
 .finish-word-hearts .filled { fill: #ff86a2; filter: drop-shadow(0 2px 5px #ff6c9c25); }
@@ -125,14 +94,10 @@
 .finish-word-final-players { list-style: none; padding: 0; margin: 22px auto; width: min(440px, 100%); display: grid; gap: 9px; text-align: left; }.finish-word-final-players li { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 10px 14px; background: #1b2b40; border-radius: 9px; font-size: 12px; overflow-wrap: anywhere; }
 
 @media (max-width: 1000px) {
-  .finish-word-lobby-layout { grid-template-columns: minmax(0, 1fr) 250px; gap: 16px; }.finish-word-character-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .finish-word-game-layout { grid-template-columns: minmax(0, 1fr) 260px; gap: 12px; }.finish-word-console { padding: 17px; }
 }
 @media (max-width: 680px) {
-  .finish-word-lobby-heading { align-items: stretch; flex-direction: column; gap: 16px; margin-bottom: 20px; }.finish-word-lobby-heading p { font-size: 12px; }.finish-word-lobby-heading h1 { font-size: 31px; }
-  .finish-word-room-code { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 12px 15px; }.finish-word-room-code strong { font-size: 18px; }.finish-word-room-code > span { font-size: 9px; }
-  .finish-word-lobby-layout { display: flex; flex-direction: column; gap: 16px; }.finish-word-roster-panel, .finish-word-lobby-sidebar { width: 100%; }.finish-word-roster-panel, .finish-word-party-panel, .finish-word-briefing { padding: 16px; border-radius: 15px; }
-  .finish-word-character-grid { gap: 10px; }.finish-word-character-option > .finish-word-character { height: 115px; }.finish-word-character-owner { font-size: 10px; }.finish-word-panel-title h2 { font-size: 16px; }.finish-word-panel-title > span { font-size: 9px; }
+  .finish-word-character-grid { gap: 10px; }.finish-word-character-option > .finish-word-character { height: 115px; }.finish-word-character-owner { font-size: 10px; }
   .in-game .screen.finish-word-game { gap: 9px; padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
   .finish-word-game-heading { gap: 6px; align-items: flex-start; }.finish-word-game-heading h1 { font-size: 20px; margin-top: 3px; }.finish-word-game-heading .eyebrow { font-size: 7px; }.finish-word-difficulty { max-width: 105px; padding: 7px 8px; font-size: 7px; line-height: 1.5; text-align: center; letter-spacing: 0; }
   .finish-word-game-layout { display: flex; flex-direction: column; gap: 9px; }.finish-word-stage-block { flex: 1; gap: 7px; }.finish-word-stage-viewport { min-height: 175px; border-radius: 15px; }.finish-word-stage-caption { top: 12px; left: 14px; font-size: 7px; }

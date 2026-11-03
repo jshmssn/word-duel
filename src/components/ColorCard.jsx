@@ -122,7 +122,7 @@ export function ColorCardGameView({ gameState, socket, myId, connected, onFeedba
 
   return <div className="screen color-card-screen">
     <div className="page-intro"><div><span className="eyebrow">COLOR CARD · CARD {progress}</span><h1>{memorizing ? <>Remember this <span>color.</span></> : <>Match it from <span>memory.</span></>}</h1><p>{memorizing ? "Everyone sees this color. In five seconds, it’s just you and your memory." : "The original is hidden. Find the hue, then dial in saturation and brightness."}</p></div></div>
-    <div className="color-round-status" role="status"><strong className={!memorizing && remaining <= 10 ? "color-time-urgent" : ""}>{memorizing ? "MEMORIZE" : `${remaining}s to match`}</strong><span>{gameState.submittedPlayerIds.length} / {gameState.players.length} answers submitted · everyone advances together</span></div>
+    <div className="color-round-status" role="status"><span>{gameState.submittedPlayerIds.length} / {gameState.players.length} answers submitted · everyone advances together</span></div>
     <TurnTimer className="color-timer" label={memorizing ? "Time to memorize" : "Time to match"} remaining={memorizing ? memorizeRemaining : remaining} total={memorizing ? 5 : gameState.roundDuration || 30} isMyTurn />
     {!memorizing && gameState.skipVote && <ColorSkipVote key={gameState.skipVote.id} vote={gameState.skipVote} now={now} socket={socket} code={gameState.code} roundId={gameState.roundId} myId={myId} connected={connected && !gameState.pausedAt} onFeedback={onFeedback} />}
     {memorizing ? <ColorSwatch color={gameState.targetColor} testId="target-color" className="color-memory-card" progress={progress} label="Memorize this color" corner={<div className="color-countdown" role="timer" aria-label={`${memorizeRemaining} seconds to memorize`}><strong>{memorizeRemaining}</strong><span>SECONDS</span></div>} />
@@ -194,8 +194,11 @@ export function ColorCardResultsView({ result, myId, onRematch, connected, onQui
   return <div className="screen color-card-screen color-results-screen">
     <ConfettiBurst active={isWinner} />
     <div className="page-intro"><div><span className="eyebrow">COLOR CARD · CARD {result.roundNumber} OF {result.totalRounds} · {reviewing ? "YOUR RESULT" : result.matchComplete ? "MATCH COMPLETE" : "RANKINGS"}</span><h1>{reviewing ? <>How close <span>did you get?</span></> : result.matchComplete ? <>Colors remembered. <span>Champion revealed.</span></> : <>Closest to <span>the color.</span></>}</h1><p role="status">{announcement}</p></div></div>
+    {(reviewing || !result.matchComplete) && <div className="color-results-countdown" role="timer" aria-label={`${remaining} seconds ${reviewing ? "until rankings" : "until the next card"}`}>
+      <TurnTimer className="color-timer" label={reviewing ? "Until rankings" : "Until next card"} remaining={remaining} total={reviewing ? result.reviewDuration || 5 : result.rankingDuration || 10} isMyTurn />
+      <p>Everyone continues automatically</p>
+    </div>}
     {!reviewing && <ColorRankingReference result={result} myId={myId} />}
-    {(reviewing || !result.matchComplete) && <div className="color-round-status"><strong role="timer">{remaining}s {reviewing ? "until rankings" : "until the next card"}</strong><span>Everyone continues automatically</span></div>}
     {!reviewing && <ColorPodium result={result} myId={myId} />}
     {reviewing ? <div className="color-results-grid color-personal-result">{entries.map((entry) => <ResultCard key={entry.id} entry={entry} result={result} myId={myId} />)}</div>
       : <div className="color-card-ranking"><h2>Card {result.roundNumber} rankings</h2><p>Closest RGB match wins this card.</p><ol>{entries.map((entry) => <li key={entry.id} className={entry.id === myId ? "is-you" : ""}>

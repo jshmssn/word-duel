@@ -112,18 +112,29 @@ for (const width of [280, 390, 1440]) {
       await expect(page.locator(".color-accuracy")).toContainText("100.00%");
       await expect(page.locator(".color-result-card")).toContainText("A perfect match");
       await expect(page.locator(".color-result-card")).toContainText("auto submitted");
-      await expect(page.getByRole("timer")).toContainText("5s until rankings");
+      const reviewTimer = page.getByRole("group", { name: "Until rankings", exact: true });
+      await expect(reviewTimer.locator(".timer-seconds")).toHaveText("5s");
+      await expect(page.getByRole("timer")).toHaveAttribute("aria-label", "5 seconds until rankings");
+      expect(await reviewTimer.evaluate((element) => Boolean(element.compareDocumentPosition(document.querySelector(".color-personal-result")) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
       await expect(page.getByTestId("target-color").first()).toHaveCSS("background-color", "rgb(163, 79, 46)");
       await page.locator(".color-result-comparison").first().screenshot({ path: testInfo.outputPath("results.png") });
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await expect(page.getByRole("button", { name: /Next card/ })).toHaveCount(0);
-      await page.clock.fastForward(5000);
+      await page.clock.fastForward(2000);
+      await expect(reviewTimer.locator(".timer-seconds")).toHaveText("3s");
+      await expect.poll(() => reviewTimer.locator(".timer-bar-fill").evaluate((element) => element.getBoundingClientRect().width / element.parentElement.getBoundingClientRect().width)).toBeCloseTo(.6, 2);
+      await page.clock.fastForward(3000);
       const rankNow = await page.evaluate(() => Date.now());
       await receive(page, "COLOR_RANKINGS", { ...result, phase: "ranking", rankingEndsAt: rankNow + 10000, serverNow: rankNow });
       await expect(page.locator(".color-card-ranking li")).toHaveCount(2);
-      await expect(page.getByRole("timer")).toContainText("10s until the next card");
+      const rankingTimer = page.getByRole("group", { name: "Until next card", exact: true });
+      await expect(rankingTimer.locator(".timer-seconds")).toHaveText("10s");
+      expect(await rankingTimer.evaluate((element) => Boolean(element.compareDocumentPosition(document.querySelector(".color-ranking-reference")) & Node.DOCUMENT_POSITION_FOLLOWING))).toBe(true);
       await expect(page.locator(".color-result-card")).toHaveCount(0);
-      await page.clock.fastForward(10000);
+      await page.clock.fastForward(4000);
+      await expect(rankingTimer.locator(".timer-seconds")).toHaveText("6s");
+      await expect.poll(() => rankingTimer.locator(".timer-bar-fill").evaluate((element) => element.getBoundingClientRect().width / element.parentElement.getBoundingClientRect().width)).toBeCloseTo(.6, 2);
+      await page.clock.fastForward(6000);
       const next = await startRound(page, 2);
       await expect(page.locator(".color-card-progress")).toHaveText("2 / 7");
       await beginPicking(page, next);
@@ -152,7 +163,7 @@ test("guest sees shared settings, keeps editing, and gets personal score feedbac
   await receive(page, "ROUND_RESULTS", { ...result, phase: "review", entries: [{ ...result.entries[0], accuracy: 7.71 }], winnerIds: [], winners: [], standings: [], reviewEndsAt: now + 5000 });
   await expect(page.locator(".color-score-feedback")).toContainText("raccoon");
   await expect(page.getByRole("button", { name: /Next card/ })).toHaveCount(0);
-  await expect(page.locator(".color-round-status")).toContainText("Everyone continues automatically");
+  await expect(page.locator(".color-results-countdown")).toContainText("Everyone continues automatically");
 });
 
 test("server timestamps synchronize a different device clock, and sliders respond to dragging", async ({ page }) => {
@@ -162,7 +173,9 @@ test("server timestamps synchronize a different device clock, and sliders respon
   await expect(page.getByRole("timer")).toHaveAttribute("aria-label", "5 seconds to memorize");
   await page.clock.fastForward(5000);
   await receive(page, "COLOR_PICKING_STARTED", { code: colorRoom.code, roundId: "clock-test", phase: "picking", roundEndsAt: 1035000, serverNow: 1005000 });
-  await expect(page.locator(".color-round-status")).toContainText("30s to match");
+  await expect(page.locator(".color-round-status")).not.toContainText(/\d+s to match/);
+  await expect(page.getByRole("group", { name: "Time to match", exact: true }).locator(".timer-seconds")).toHaveText("30s");
+  await expect(page.locator(".color-timer")).toHaveCount(1);
   const saturation = page.getByRole("slider", { name: "Saturation", exact: true });
   await saturation.scrollIntoViewIfNeeded();
   const box = await saturation.boundingBox();

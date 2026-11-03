@@ -95,6 +95,33 @@ for (const mode of ["word-duel", "color-card", "finish-word"]) {
   });
 }
 
+for (const gameMode of ["word-duel", "color-card", "finish-word"]) {
+  test(`${gameMode}: removing the last opponent closes the paused match and opens the waiting room`, async ({ page }) => {
+    const now = await page.evaluate(() => Date.now());
+    const roster = players.map((player, index) => ({ ...player, connected: true, characterId: index ? "wizard" : "knight", lives: 3, isAlive: true }));
+    const match = { ...room, gameMode, players: roster };
+    await receive(page, "room-created", match);
+    await receive(page, gameMode === "finish-word" ? "turn_start" : gameMode === "color-card" ? "START_GAME" : "game-start", {
+      ...game, ...match, status: "PLAYING", gameId: "last-opponent", currentPlayerId: roster[0].id,
+      currentTurnIndex: 0, turnId: "one", turnDuration: 15, turnEndsAt: now + 15000, serverNow: now,
+      requiredPrefix: "a", usedWords: [], history: [], roundId: "last-card", phase: "picking", roundNumber: 1,
+      totalRounds: 5, memorizeEndsAt: now, roundEndsAt: now + 30000, roundDuration: 30, submittedPlayerIds: [],
+    });
+    await receive(page, "ROOM_PAUSED", { code: room.code, players: [roster[0], { ...roster[1], connected: false }],
+      pausedAt: now, serverNow: now, kickVotes: [], message: "The opponent disconnected." });
+    await expect(page.getByRole("dialog", { name: "Room paused" })).toBeVisible();
+    await receive(page, "player-left", { code: room.code, playerId: roster[1].id, username: roster[1].username,
+      message: "The opponent was removed. Waiting for another player to join." });
+    await receive(page, "rematch-lobby", { ...match, players: [{ ...roster[0], ready: false }], pausedAt: null, kickVotes: [], departure: true });
+    await expect(page.locator(".waiting-screen")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "Room paused" })).toHaveCount(0);
+    await expect(page.locator(".color-timer, .game-screen, .finish-word-game, .gameover-screen")).toHaveCount(0);
+    await expect(page.locator(".player-capacity")).toHaveText("1 / 2 PLAYERS");
+    await expect(page.locator(".room-code-chars")).toHaveText(room.code);
+    await expect(page.locator(".invite-nudge")).toContainText("Invite someone to join your room");
+  });
+}
+
 test("a failed session recovery still offers Reconnect when the transport and roster appear connected", async ({ page }) => {
   const session = { code: room.code, playerId: players[0].id, token: "retry-token" };
   await receive(page, "room-session", session);

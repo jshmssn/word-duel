@@ -240,13 +240,13 @@ html.game-viewport { height: 100%; overflow: hidden; overscroll-behavior: none; 
 .color-vote-overlay .color-vote-actions { flex-wrap: wrap; gap: 12px; margin: 16px 0; }
 .color-vote-overlay .color-vote-actions button { min-height: 44px; flex-basis: 130px; }
 .color-vote-minimize { margin-top: 16px; width: 100%; }
-.in-game .color-timer.turn-timer-wrap { flex: none; padding: 9px 15px; margin: 0; border-color: #5ce6b960; background: #183c3d; box-shadow: inset 0 0 24px #6ee9b90a; }
-.in-game .color-timer .timer-label { display: flex; align-items: center; margin-bottom: 4px; font-size: 12px; }
-.in-game .color-timer .timer-label-title { display: inline-flex; align-items: center; gap: 8px; color: #c5f6e2; }
-.in-game .color-timer .timer-seconds { font-size: 34px; line-height: 1; letter-spacing: -1px; }
+.color-timer.turn-timer-wrap { flex: none; padding: 9px 15px; margin: 0; border-color: #5ce6b960; background: #183c3d; box-shadow: inset 0 0 24px #6ee9b90a; }
+.color-timer .timer-label { display: flex; align-items: center; margin-bottom: 4px; font-size: 12px; }
+.color-timer .timer-label-title { display: inline-flex; align-items: center; gap: 8px; color: #c5f6e2; }
+.color-timer .timer-seconds { font-size: 34px; line-height: 1; letter-spacing: -1px; }
 .timer-seconds small { font-size: .65em; margin-left: 2px; }
-.in-game .color-timer .timer-bar-bg { height: 7px; }
-.in-game .color-timer.timer-danger { border-color: #ffb476aa; background: #442c35; }
+.color-timer .timer-bar-bg { height: 7px; }
+.color-timer.timer-danger { border-color: #ffb476aa; background: #442c35; }
 .color-skip-vote { flex: none; width: 100%; padding: 14px 16px; border: 1px solid #baa4ff77; border-radius: 16px; background: #30294e; box-shadow: 0 8px 28px #0003; animation: panel-arrive .3s ease both; }
 .color-vote-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .color-vote-heading > div { min-width: 0; }
@@ -272,14 +272,14 @@ html.game-viewport { height: 100%; overflow: hidden; overscroll-behavior: none; 
   .color-skip-vote { padding: 11px 12px; }
   .color-vote-heading h2 { font-size: 18px; }
   .color-vote-actions button { font-size: 11px; }
-  .in-game .color-timer .timer-seconds { font-size: 30px; }
+  .color-timer .timer-seconds { font-size: 30px; }
   .room-pause-overlay, .in-game .room-pause-overlay { top: 67px; }
 }
 @media (max-height: 500px) {
   .in-game .screen { padding-bottom: 64px; }
-  .in-game .color-timer.turn-timer-wrap { padding: 5px 12px; }
-  .in-game .color-timer .timer-seconds { font-size: 25px; }
-  .in-game .color-timer .timer-bar-bg { height: 5px; }
+  .color-timer.turn-timer-wrap { padding: 5px 12px; }
+  .color-timer .timer-seconds { font-size: 25px; }
+  .color-timer .timer-bar-bg { height: 5px; }
   .in-game .color-voting { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(230px,1fr); grid-template-rows: auto minmax(0,1fr); gap: 6px 10px; align-items: stretch; justify-items: stretch; align-content: stretch; }
   .in-game .color-voting .color-round-status { display: none; }
   .in-game .color-voting .color-timer { grid-column: 1/-1; grid-row: 1; }

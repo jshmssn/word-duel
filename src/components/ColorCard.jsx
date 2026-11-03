@@ -146,10 +146,10 @@ function ResultCard({ entry, result, myId }) {
   return <article className={`color-result-card ${result.winnerIds.includes(entry.id) ? "color-winner" : ""}`}>
     <div className="color-result-player"><h2>{entry.username}{entry.id === myId ? " (you)" : ""}</h2>{result.winnerIds.includes(entry.id) && <span className="color-winner-badge">Card winner</span>}</div>
     <div className="color-result-comparison">
+      <ColorSwatch color={result.targetColor} testId="target-color" className="color-original-result" label="Original" detail={result.targetColor} />
       <ColorSwatch color={entry.submittedColor} testId="picked-color" className="color-submitted-result" progress={`${result.roundNumber || 1} / ${result.totalRounds || 5}`} label={entry.autoSubmitted ? "Your selection · auto submitted" : "Your selection"} detail={hsv ? `H${Math.round(hsv.h)} S${Math.round(hsv.s)} V${Math.round(hsv.v)} · ${entry.submittedColor}` : "No submission"} corner={<div className="color-accuracy" aria-label={entry.accuracy === null ? "Unranked" : `Accuracy ${entry.accuracy.toFixed(2)} percent`}><span>ACCURACY</span><strong>{entry.accuracy === null ? "—" : entry.accuracy.toFixed(2)}{entry.accuracy !== null && <small>%</small>}</strong></div>}>
         <p className="color-score-feedback">{scoreFeedback(entry.accuracy)}</p>
       </ColorSwatch>
-      <ColorSwatch color={result.targetColor} testId="target-color" className="color-original-result" label="Original" detail={result.targetColor} />
     </div>
     <div className="color-result-distance">RGB distance <strong>{entry.distance === null ? "Unranked" : entry.distance.toFixed(2)}</strong></div>
     <div className="color-result-time">Time consumed <strong>{entry.timeConsumedMs == null ? "—" : `${(entry.timeConsumedMs / 1000).toFixed(2)}s`}{entry.autoSubmitted ? " · Auto submitted" : ""}</strong></div>

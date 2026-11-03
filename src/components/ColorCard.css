@@ -78,7 +78,7 @@
 .color-result-comparison .color-swatch-label { max-width: 100%; }
 .color-winner .color-result-comparison { outline: 2px solid #88dec487; outline-offset: 3px; }
 .color-submitted-result { min-height: 240px; }
-.color-original-result { min-height: 150px; border-top: 1px solid #ffffff20; }
+.color-original-result { min-height: 150px; }
 .color-accuracy { position: absolute; top: 15px; right: 20px; display: flex; align-items: flex-end; flex-direction: column; }
 .color-accuracy > span { font: 700 9px var(--font-mono); letter-spacing: 1.4px; opacity: .65; }
 .color-accuracy > strong { font: 700 clamp(42px, 5vw, 70px)/1.1 var(--font-display); letter-spacing: -4px; }

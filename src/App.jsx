@@ -1356,7 +1356,7 @@ export default function App() {
       try {
         const response = await sock.timeout(5000).emitWithAck("resume-room", session);
         if (!response.success) { resetRoom(); showFeedback(response.message, "error"); }
-      } catch { setRestoring(false); setRoomPause({ message: "Could not restore the room yet. Reconnecting…" }); showFeedback("Room recovery is taking longer than expected. Tap Reconnect to retry.", "error"); }
+      } catch { setRestoring(false); setRoomPause({ recoveryFailed: true, message: "Could not restore the room yet. Reconnecting…" }); showFeedback("Room recovery is taking longer than expected. Tap Reconnect to retry.", "error"); }
       finally { resuming = false; }
     };
     const onDisconnect = () => {

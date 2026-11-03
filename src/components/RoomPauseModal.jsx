@@ -18,7 +18,7 @@ export default function RoomPauseModal({ players, myId, pause, restoring, connec
   }, []);
   const serverNow = now + (pause?.serverClockOffset || 0);
   const votes = pause?.kickVotes || [];
-  const active = connected && players.find((player) => player.id === myId)?.connected !== false && !restoring;
+  const active = connected && players.find((player) => player.id === myId)?.connected !== false && !restoring && !pause?.recoveryFailed;
 
   async function choose(vote, choice) {
     if (request.current || !active) return;
@@ -66,7 +66,7 @@ export default function RoomPauseModal({ players, myId, pause, restoring, connec
       <p>Game timers resume when the remaining players are connected.</p>
       {error && <p role="alert">{error}</p>}
       <div className="room-pause-controls">
-        <button type="button" className="btn-fun btn-fun-yellow" onClick={onReconnect} disabled={restoring}>Reconnect</button>
+        {!active && <button type="button" className="btn-fun btn-fun-yellow" onClick={onReconnect} disabled={restoring}>Reconnect</button>}
         <button type="button" className="btn-fun btn-fun-ghost" onClick={onQuit} disabled={leaving}>{leaving ? "Quitting…" : "Quit room"}</button>
       </div>
     </section>

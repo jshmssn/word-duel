@@ -114,6 +114,7 @@ test("the pause dialog lists every connection and offers a kick vote after 45 se
   await expect(dialog.getByText("Connected", { exact: true })).toBeVisible();
   await expect(dialog.getByText("Reconnecting", { exact: true })).toBeVisible();
   await expect(dialog.getByText("Disconnected", { exact: true })).toBeVisible();
+  await expect(dialog.getByRole("button", { name: "Reconnect", exact: true })).toHaveCount(0);
   await expect(dialog.getByRole("button", { name: `Vote to kick ${players[1].username}` })).toHaveCount(0);
   await page.clock.fastForward(45000);
   const vote = { id: "kick-poll", playerId: players[1].id, totalPlayers: 1, requiredYes: 1, yesPlayerIds: [], noPlayerIds: [] };

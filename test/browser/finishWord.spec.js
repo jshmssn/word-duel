@@ -230,6 +230,8 @@ test("hard mode, heart loss, elimination, results and rematch use authoritative 
   const state = await start(page, { requiredPrefix: "le", hardMode: true, successfulTurns: 10, lastWord: "apple" });
   await expect(page.getByTestId("required-prefix")).toHaveText("LE");
   await expect(page.locator(".finish-word-difficulty")).toContainText("HARD MODE");
+  await expect(page.locator(".finish-word-prefix-prompt")).toContainText("START YOUR WORD WITH");
+  await expect(page.getByRole("textbox", { name: "Your word" })).toHaveAttribute("placeholder", "LE…");
   const damaged = [{ ...roster[0], lives: 2 }, roster[1]];
   await receive(page, "turn_start", { ...state, turnId: "turn-2", players: damaged, currentPlayerId: roster[1].id });
   await expect(page.getByRole("article", { name: `${roster[0].username}, 2 lives`, exact: true }).getByRole("img", { name: "2 lives remaining" })).toHaveCount(1);
